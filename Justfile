@@ -50,10 +50,6 @@ vet:
 lint: fmt vet
     @echo "Linting complete"
 
-# Run all tests
-test:
-    @just test::all
-
 # Clean build artifacts
 clean:
     #!/usr/bin/env bash

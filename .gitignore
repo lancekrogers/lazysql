@@ -1,7 +1,7 @@
 tmp/build-errors.log
 .air.toml
 tmp/main
-
+bin/
 dist/
 test.db
 
