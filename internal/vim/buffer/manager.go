@@ -6,7 +6,10 @@ import (
 	"sync"
 )
 
-var ErrBufferNotFound = errors.New("buffer not found")
+var (
+	ErrBufferNotFound = errors.New("buffer not found")
+	ErrBufferDirty    = errors.New("buffer has unsaved changes")
+)
 
 type EventType uint8
 
@@ -141,17 +144,31 @@ func (m *Manager) MarkSaved(id BufferID) error {
 }
 
 func (m *Manager) Close(id BufferID) error {
+	return m.close(id, false)
+}
+
+func (m *Manager) CloseForce(id BufferID) error {
+	return m.close(id, true)
+}
+
+func (m *Manager) close(id BufferID, allowDirty bool) error {
 	m.mu.Lock()
 	buf, ok := m.buffers[id]
 	if !ok {
 		m.mu.Unlock()
 		return ErrBufferNotFound
 	}
+	if buf.Dirty && !allowDirty {
+		m.mu.Unlock()
+		return ErrBufferDirty
+	}
+	nextActive := m.active
+	if m.active == id {
+		nextActive = m.nextActive(id)
+	}
 	delete(m.buffers, id)
 	m.order = removeID(m.order, id)
-	if m.active == id {
-		m.active = m.nextActive(id)
-	}
+	m.active = nextActive
 	listeners := append([]func(BufferEvent){}, m.listeners...)
 	m.mu.Unlock()
 
@@ -188,6 +205,12 @@ func (m *Manager) AddListener(fn func(BufferEvent)) {
 func (m *Manager) nextActive(closedID BufferID) BufferID {
 	if len(m.order) == 0 {
 		return 0
+	}
+	if len(m.order) == 1 {
+		if m.order[0] == closedID {
+			return 0
+		}
+		return m.order[0]
 	}
 	for i, id := range m.order {
 		if id == closedID {

@@ -1,6 +1,9 @@
 package buffer
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 func TestBufferCreateAndActivate(t *testing.T) {
 	manager := NewManager()
@@ -77,6 +80,29 @@ func TestBufferClose(t *testing.T) {
 	}
 }
 
+func TestBufferCloseSelectsNeighbor(t *testing.T) {
+	manager := NewManager()
+	first := manager.Create("one")
+	second := manager.Create("two")
+	third := manager.Create("three")
+
+	if err := manager.SetActive(first.ID); err != nil {
+		t.Fatalf("set active: %v", err)
+	}
+	if err := manager.Close(first.ID); err != nil {
+		t.Fatalf("close buffer: %v", err)
+	}
+	if manager.ActiveID() != second.ID {
+		t.Fatalf("expected next buffer to be active, got %d", manager.ActiveID())
+	}
+	if err := manager.Close(second.ID); err != nil {
+		t.Fatalf("close buffer: %v", err)
+	}
+	if manager.ActiveID() != third.ID {
+		t.Fatalf("expected remaining buffer to be active, got %d", manager.ActiveID())
+	}
+}
+
 func TestBufferErrors(t *testing.T) {
 	manager := NewManager()
 	if err := manager.SetActive(99); err == nil {
@@ -90,6 +116,21 @@ func TestBufferErrors(t *testing.T) {
 	}
 	if err := manager.Close(99); err == nil {
 		t.Fatal("expected error for missing buffer")
+	}
+}
+
+func TestBufferCloseDirtyRequiresForce(t *testing.T) {
+	manager := NewManager()
+	buffer := manager.Create("one")
+
+	if err := manager.UpdateContent(buffer.ID, "select 1"); err != nil {
+		t.Fatalf("update content: %v", err)
+	}
+	if err := manager.Close(buffer.ID); !errors.Is(err, ErrBufferDirty) {
+		t.Fatalf("expected ErrBufferDirty, got %v", err)
+	}
+	if err := manager.CloseForce(buffer.ID); err != nil {
+		t.Fatalf("close force: %v", err)
 	}
 }
 
