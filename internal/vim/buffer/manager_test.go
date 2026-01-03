@@ -119,6 +119,37 @@ func TestBufferErrors(t *testing.T) {
 	}
 }
 
+func TestBufferCountAndFindByPath(t *testing.T) {
+	manager := NewManager()
+	if manager.Count() != 0 {
+		t.Fatalf("expected count 0, got %d", manager.Count())
+	}
+	first := manager.Create("one")
+	second := manager.Create("two")
+
+	if err := manager.UpdateMetadata(first.ID, "", "/tmp/one.sql"); err != nil {
+		t.Fatalf("update metadata: %v", err)
+	}
+	if err := manager.UpdateMetadata(second.ID, "", "/tmp/two.sql"); err != nil {
+		t.Fatalf("update metadata: %v", err)
+	}
+
+	if manager.Count() != 2 {
+		t.Fatalf("expected count 2, got %d", manager.Count())
+	}
+	found := manager.FindByPath("/tmp/two.sql")
+	if found == nil || found.ID != second.ID {
+		t.Fatalf("expected to find second buffer, got %+v", found)
+	}
+}
+
+func TestBufferUpdateMetadataErrors(t *testing.T) {
+	manager := NewManager()
+	if err := manager.UpdateMetadata(42, "missing", "/tmp/missing.sql"); err == nil {
+		t.Fatal("expected error for missing buffer")
+	}
+}
+
 func TestBufferCloseDirtyRequiresForce(t *testing.T) {
 	manager := NewManager()
 	buffer := manager.Create("one")

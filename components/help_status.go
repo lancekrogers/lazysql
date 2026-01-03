@@ -3,8 +3,8 @@ package components
 import (
 	"github.com/rivo/tview"
 
-	"github.com/jorgerojas26/lazysql/app"
-	"github.com/jorgerojas26/lazysql/keymap"
+	"github.com/lancekrogers/lazysql/app"
+	"github.com/lancekrogers/lazysql/keymap"
 )
 
 type HelpStatus struct {

@@ -4,7 +4,7 @@ import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 
-	"github.com/jorgerojas26/lazysql/app"
+	"github.com/lancekrogers/lazysql/app"
 )
 
 type ConfirmationModal struct {

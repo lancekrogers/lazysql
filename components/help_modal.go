@@ -6,9 +6,9 @@ import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 
-	"github.com/jorgerojas26/lazysql/app"
-	"github.com/jorgerojas26/lazysql/commands"
-	"github.com/jorgerojas26/lazysql/keymap"
+	"github.com/lancekrogers/lazysql/app"
+	"github.com/lancekrogers/lazysql/commands"
+	"github.com/lancekrogers/lazysql/keymap"
 )
 
 type KeybindGroup struct {

@@ -3,8 +3,8 @@ package app
 import (
 	"github.com/gdamore/tcell/v2"
 
-	cmd "github.com/jorgerojas26/lazysql/commands"
-	"github.com/jorgerojas26/lazysql/keymap"
+	cmd "github.com/lancekrogers/lazysql/commands"
+	"github.com/lancekrogers/lazysql/keymap"
 )
 
 // local alias added for clarity purpose

@@ -1,6 +1,6 @@
 package leader
 
-import "github.com/jorgerojas26/lazysql/internal/vim/whichkey"
+import "github.com/lancekrogers/lazysql/internal/vim/whichkey"
 
 type ParseStatus uint8
 

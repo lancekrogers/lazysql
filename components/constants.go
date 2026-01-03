@@ -3,7 +3,7 @@ package components
 import (
 	"github.com/gdamore/tcell/v2"
 
-	"github.com/jorgerojas26/lazysql/app"
+	"github.com/lancekrogers/lazysql/app"
 )
 
 var App = app.App
@@ -11,12 +11,15 @@ var App = app.App
 // Pages
 const (
 	// General
-	pageNameHelp          string = "Help"
-	pageNameConfirmation  string = "Confirmation"
-	pageNameConnections   string = "Connections"
-	pageNameDMLPreview    string = "DMLPreview"
-	pageNameErrorModal    string = "ErrorModal"
-	pageNameReadOnlyError string = "readOnlyError"
+	pageNameHelp              string = "Help"
+	pageNameConfirmation      string = "Confirmation"
+	pageNameConnections       string = "Connections"
+	pageNameDMLPreview        string = "DMLPreview"
+	pageNameErrorModal        string = "ErrorModal"
+	pageNameReadOnlyError     string = "readOnlyError"
+	pageNameStatusHelp        string = "StatusHelp"
+	pageNameStatusCommandLine string = "StatusCommandLine"
+	pageNameStatusMessage     string = "StatusMessage"
 
 	// Results table
 	pageNameTable                  string = "Table"

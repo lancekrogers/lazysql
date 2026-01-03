@@ -98,6 +98,26 @@ func (m *Manager) ActiveID() BufferID {
 	return m.active
 }
 
+func (m *Manager) Count() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return len(m.buffers)
+}
+
+func (m *Manager) FindByPath(path string) *Buffer {
+	if path == "" {
+		return nil
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, buf := range m.buffers {
+		if buf.FilePath == path {
+			return buf
+		}
+	}
+	return nil
+}
+
 func (m *Manager) SetActive(id BufferID) error {
 	m.mu.Lock()
 	buf, ok := m.buffers[id]
@@ -140,6 +160,31 @@ func (m *Manager) MarkSaved(id BufferID) error {
 	m.mu.Unlock()
 
 	notify(listeners, BufferEvent{Type: EventSaved, Buffer: buf})
+	return nil
+}
+
+func (m *Manager) UpdateMetadata(id BufferID, name string, path string) error {
+	m.mu.Lock()
+	buf, ok := m.buffers[id]
+	if !ok {
+		m.mu.Unlock()
+		return ErrBufferNotFound
+	}
+	changed := false
+	if name != "" && buf.Name != name {
+		buf.Name = name
+		changed = true
+	}
+	if path != "" && buf.FilePath != path {
+		buf.FilePath = path
+		changed = true
+	}
+	listeners := append([]func(BufferEvent){}, m.listeners...)
+	m.mu.Unlock()
+
+	if changed {
+		notify(listeners, BufferEvent{Type: EventModified, Buffer: buf})
+	}
 	return nil
 }
 

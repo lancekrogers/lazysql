@@ -3,7 +3,7 @@ package components
 import (
 	"github.com/rivo/tview"
 
-	"github.com/jorgerojas26/lazysql/models"
+	"github.com/lancekrogers/lazysql/models"
 )
 
 func NewConnectionPages() *models.ConnectionPages {

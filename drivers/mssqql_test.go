@@ -9,7 +9,7 @@ import (
 	// mssql driver
 	_ "github.com/microsoft/go-mssqldb"
 
-	"github.com/jorgerojas26/lazysql/models"
+	"github.com/lancekrogers/lazysql/models"
 )
 
 const (

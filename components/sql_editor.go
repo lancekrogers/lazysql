@@ -8,10 +8,11 @@ import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 
-	"github.com/jorgerojas26/lazysql/app"
-	"github.com/jorgerojas26/lazysql/commands"
-	"github.com/jorgerojas26/lazysql/helpers/logger"
-	"github.com/jorgerojas26/lazysql/models"
+	"github.com/lancekrogers/lazysql/app"
+	"github.com/lancekrogers/lazysql/commands"
+	"github.com/lancekrogers/lazysql/helpers/logger"
+	"github.com/lancekrogers/lazysql/internal/vim/modes"
+	"github.com/lancekrogers/lazysql/models"
 )
 
 type SQLEditorState struct {
@@ -23,6 +24,9 @@ type SQLEditor struct {
 	state         *SQLEditorState
 	subscribers   []chan models.StateChange
 	ConnectionURL string
+	modeManager   *modes.ModeManager
+	normalHandler *modes.NormalHandler
+	insertHandler *modes.InsertHandler
 }
 
 func NewSQLEditor(connectionURL string) *SQLEditor {
@@ -37,32 +41,19 @@ func NewSQLEditor(connectionURL string) *SQLEditor {
 		},
 		ConnectionURL: connectionURL,
 	}
-	sqlEditor.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		command := app.Keymaps.Group(app.EditorGroup).Resolve(event)
-
-		switch command {
-		case commands.Execute:
-			sqlEditor.Publish(eventSQLEditorQuery, sqlEditor.GetText())
-			return nil
-
-		case commands.UnfocusEditor:
-			sqlEditor.Publish(eventSQLEditorEscape, "")
-
-		case commands.OpenInExternalEditor:
-			// THIS IS A LINUX-ONLY FEATURE (for now)
-			if runtime.GOOS == "linux" || runtime.GOOS == "darwin" {
-				var newText string
-				app.App.Suspend(func() {
-					newText = openExternalEditor(sqlEditor.GetText(), sqlEditor.ConnectionURL)
-				})
-				sqlEditor.SetText(newText, true)
-			}
-		}
-
-		return event
-	})
+	sqlEditor.SetInputCapture(sqlEditor.handleInput)
 
 	return sqlEditor
+}
+
+func (s *SQLEditor) EnableVim(modeManager *modes.ModeManager, leader modes.LeaderActivator, commandLine modes.CommandLineActivator) {
+	if modeManager == nil {
+		return
+	}
+	adapter := modes.NewTextAreaAdapter(s.TextArea)
+	s.modeManager = modeManager
+	s.normalHandler = modes.NewNormalHandler(modeManager, leader, commandLine, adapter)
+	s.insertHandler = modes.NewInsertHandler(modeManager, adapter)
 }
 
 func (s *SQLEditor) Subscribe() chan models.StateChange {
@@ -94,8 +85,53 @@ func (s *SQLEditor) Highlight() {
 }
 
 func (s *SQLEditor) SetBlur() {
+	if s.modeManager != nil {
+		s.modeManager.EnterNormal()
+	}
 	s.SetBorderColor(app.Styles.InverseTextColor)
 	s.SetTextStyle(tcell.StyleDefault.Foreground(app.Styles.InverseTextColor))
+}
+
+func (s *SQLEditor) handleInput(event *tcell.EventKey) *tcell.EventKey {
+	if event == nil {
+		return nil
+	}
+
+	if s.modeManager != nil {
+		if s.modeManager.Mode() == modes.ModeInsert {
+			if s.insertHandler != nil && s.insertHandler.HandleKey(event) {
+				return nil
+			}
+		} else {
+			if s.normalHandler != nil && s.normalHandler.HandleKey(event) {
+				return nil
+			}
+			if event.Key() == tcell.KeyRune {
+				return nil
+			}
+		}
+	}
+
+	command := app.Keymaps.Group(app.EditorGroup).Resolve(event)
+
+	switch command {
+	case commands.Execute:
+		s.Publish(eventSQLEditorQuery, s.GetText())
+		return nil
+	case commands.UnfocusEditor:
+		s.Publish(eventSQLEditorEscape, "")
+	case commands.OpenInExternalEditor:
+		// THIS IS A LINUX-ONLY FEATURE (for now)
+		if runtime.GOOS == "linux" || runtime.GOOS == "darwin" {
+			var newText string
+			app.App.Suspend(func() {
+				newText = openExternalEditor(s.GetText(), s.ConnectionURL)
+			})
+			s.SetText(newText, true)
+		}
+	}
+
+	return event
 }
 
 // openExternalEditor opens the user's preferred editor to edit the query.

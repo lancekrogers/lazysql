@@ -4,7 +4,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/jorgerojas26/lazysql/internal/vim/whichkey"
+	"github.com/lancekrogers/lazysql/internal/vim/whichkey"
 )
 
 var (

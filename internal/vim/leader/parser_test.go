@@ -3,7 +3,7 @@ package leader
 import (
 	"testing"
 
-	"github.com/jorgerojas26/lazysql/internal/vim/whichkey"
+	"github.com/lancekrogers/lazysql/internal/vim/whichkey"
 )
 
 func TestSequenceParserParse(t *testing.T) {

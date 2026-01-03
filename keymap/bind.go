@@ -3,7 +3,7 @@ package keymap
 import (
 	"fmt"
 
-	"github.com/jorgerojas26/lazysql/commands"
+	"github.com/lancekrogers/lazysql/commands"
 )
 
 // Struct that holds a key and a command

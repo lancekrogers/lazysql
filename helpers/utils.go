@@ -9,7 +9,7 @@ import (
 
 	"github.com/xo/dburl"
 
-	"github.com/jorgerojas26/lazysql/commands"
+	"github.com/lancekrogers/lazysql/commands"
 )
 
 func ParseConnectionString(url string) (*dburl.URL, error) {

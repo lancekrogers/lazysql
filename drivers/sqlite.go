@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jorgerojas26/lazysql/models"
+	"github.com/lancekrogers/lazysql/models"
 )
 
 type SQLite struct {

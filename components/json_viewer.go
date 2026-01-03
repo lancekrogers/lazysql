@@ -9,10 +9,10 @@ import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 
-	"github.com/jorgerojas26/lazysql/app"
-	"github.com/jorgerojas26/lazysql/commands"
-	"github.com/jorgerojas26/lazysql/helpers/logger"
-	"github.com/jorgerojas26/lazysql/lib"
+	"github.com/lancekrogers/lazysql/app"
+	"github.com/lancekrogers/lazysql/commands"
+	"github.com/lancekrogers/lazysql/helpers/logger"
+	"github.com/lancekrogers/lazysql/lib"
 )
 
 type JSONViewer struct {

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jorgerojas26/lazysql/drivers"
-	"github.com/jorgerojas26/lazysql/helpers"
-	"github.com/jorgerojas26/lazysql/models"
+	"github.com/lancekrogers/lazysql/drivers"
+	"github.com/lancekrogers/lazysql/helpers"
+	"github.com/lancekrogers/lazysql/models"
 )
 
 func InitFromArg(connectionString string, readOnly bool) error {

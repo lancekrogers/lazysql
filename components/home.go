@@ -8,13 +8,16 @@ import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 
-	"github.com/jorgerojas26/lazysql/app"
-	"github.com/jorgerojas26/lazysql/commands"
-	"github.com/jorgerojas26/lazysql/drivers"
-	"github.com/jorgerojas26/lazysql/helpers/logger"
-	"github.com/jorgerojas26/lazysql/internal/history"
-	"github.com/jorgerojas26/lazysql/internal/vim/modes"
-	"github.com/jorgerojas26/lazysql/models"
+	"github.com/lancekrogers/lazysql/app"
+	"github.com/lancekrogers/lazysql/commands"
+	"github.com/lancekrogers/lazysql/drivers"
+	"github.com/lancekrogers/lazysql/helpers/logger"
+	"github.com/lancekrogers/lazysql/internal/history"
+	"github.com/lancekrogers/lazysql/internal/vim/buffer"
+	"github.com/lancekrogers/lazysql/internal/vim/cmdline"
+	cmdlinecommands "github.com/lancekrogers/lazysql/internal/vim/cmdline/commands"
+	"github.com/lancekrogers/lazysql/internal/vim/modes"
+	"github.com/lancekrogers/lazysql/models"
 )
 
 type Home struct {
@@ -29,6 +32,11 @@ type Home struct {
 	HelpStatus           HelpStatus
 	ModeManager          *modes.ModeManager
 	ModeIndicator        *modes.ModeIndicator
+	CommandLine          *cmdline.CommandLine
+	StatusPages          *tview.Pages
+	StatusLine           *StatusLine
+	BufferManager        *buffer.Manager
+	BufferController     *BufferController
 	HelpModal            *HelpModal
 	QueryHistoryModal    *QueryHistoryModal
 	DBDriver             drivers.Driver
@@ -58,6 +66,10 @@ func NewHomePage(connection models.Connection, dbdriver drivers.Driver) *Home {
 
 	modeManager := modes.NewManager()
 	modeIndicator := modes.NewModeIndicator(modeManager)
+	commandLine := cmdline.NewCommandLine(app.App, cmdline.NewCommandHistory(100))
+	commandLine.SetContext(app.App.Context())
+	bufferManager := buffer.NewManager()
+	statusLine := NewStatusLine()
 
 	home := &Home{
 		Flex:               tview.NewFlex().SetDirection(tview.FlexRow),
@@ -70,6 +82,9 @@ func NewHomePage(connection models.Connection, dbdriver drivers.Driver) *Home {
 		HelpStatus:         NewHelpStatus(),
 		ModeManager:        modeManager,
 		ModeIndicator:      modeIndicator,
+		CommandLine:        commandLine,
+		StatusLine:         statusLine,
+		BufferManager:      bufferManager,
 		HelpModal:          NewHelpModal(),
 
 		DBDriver:             dbdriver,
@@ -117,8 +132,45 @@ func NewHomePage(connection models.Connection, dbdriver drivers.Driver) *Home {
 	maincontent.AddItem(rightWrapper, 0, 5, false)
 
 	statusBar := tview.NewFlex().SetDirection(tview.FlexColumn)
-	statusBar.AddItem(home.HelpStatus, 0, 1, false)
+	statusPages := tview.NewPages()
+	statusPages.AddPage(pageNameStatusHelp, home.HelpStatus, true, true)
+	statusPages.AddPage(pageNameStatusCommandLine, commandLine, true, false)
+	statusPages.AddPage(pageNameStatusMessage, statusLine, true, false)
+	commandLine.SetOnShow(func() {
+		statusPages.SwitchToPage(pageNameStatusCommandLine)
+	})
+	commandLine.SetOnHide(func() {
+		current, _ := statusPages.GetFrontPage()
+		if current == pageNameStatusCommandLine || current == "" {
+			statusPages.SwitchToPage(pageNameStatusHelp)
+		}
+	})
+	home.StatusPages = statusPages
+
+	statusBar.AddItem(statusPages, 0, 1, false)
 	statusBar.AddItem(home.ModeIndicator, 14, 0, false)
+
+	commandLine.SetOnError(func(err error) {
+		if err != nil {
+			home.showStatusError(err.Error())
+		}
+	})
+
+	registry := cmdline.NewRegistry()
+	registry.Register(&cmdlinecommands.WriteCommand{})
+	registry.Register(&cmdlinecommands.EditCommand{})
+	registry.Register(&cmdlinecommands.QuitCommand{})
+	registry.Register(&cmdlinecommands.WriteQuitCommand{})
+	registry.Register(&cmdlinecommands.QuitAllCommand{})
+	registry.RegisterAlias("x", "wq")
+	registry.RegisterAlias("exit", "qa")
+
+	executor := cmdline.NewCommandExecutor(registry, &cmdline.CommandContext{
+		Buffers: bufferManager,
+		Status:  homeStatusReporter{home: home},
+		App:     app.App,
+	})
+	commandLine.SetExecutor(executor)
 
 	home.AddItem(maincontent, 0, 1, false)
 	home.AddItem(statusBar, 1, 0, false)
@@ -288,6 +340,7 @@ func (home *Home) focusTab(tab *Tab) {
 		} else {
 			home.HelpStatus.SetStatusOnTableView()
 		}
+		home.showHelpStatus()
 	}
 }
 
@@ -538,16 +591,70 @@ func (home *Home) createOrFocusEditorTab() {
 		home.TabbedPane.SwitchToTabByName(tabNameEditor)
 		table := tab.Content.(*ResultsTable)
 		table.SetIsFiltering(true)
+		if table.Editor != nil {
+			table.Editor.EnableVim(home.ModeManager, nil, home.CommandLine)
+			if home.BufferController == nil {
+				home.BufferController = NewBufferController(home.BufferManager, table.Editor)
+			}
+		}
 	} else {
 		tableWithEditor := NewResultsTable(&home.ListOfDBChanges, home.Tree, home.DBDriver, home.ConnectionIdentifier, home.ConnectionURL, home.ReadOnly).WithEditor()
 		home.TabbedPane.AppendTab(tabNameEditor, tableWithEditor, tabNameEditor)
 		tableWithEditor.SetIsFiltering(true)
+		if tableWithEditor.Editor != nil {
+			tableWithEditor.Editor.EnableVim(home.ModeManager, nil, home.CommandLine)
+			if home.BufferController == nil {
+				home.BufferController = NewBufferController(home.BufferManager, tableWithEditor.Editor)
+			}
+		}
 		home.TabbedPane.GetCurrentTab()
 	}
 
 	home.HelpStatus.SetStatusOnEditorView()
+	home.showHelpStatus()
 	home.focusRightWrapper()
 	App.ForceDraw()
+}
+
+func (home *Home) showHelpStatus() {
+	if home.StatusPages == nil {
+		return
+	}
+	home.StatusPages.SwitchToPage(pageNameStatusHelp)
+}
+
+func (home *Home) showStatusInfo(message string) {
+	if home.StatusLine == nil || home.StatusPages == nil {
+		return
+	}
+	home.StatusLine.Info(message)
+	home.StatusPages.SwitchToPage(pageNameStatusMessage)
+}
+
+func (home *Home) showStatusError(message string) {
+	if home.StatusLine == nil || home.StatusPages == nil {
+		return
+	}
+	home.StatusLine.Error(message)
+	home.StatusPages.SwitchToPage(pageNameStatusMessage)
+}
+
+type homeStatusReporter struct {
+	home *Home
+}
+
+func (r homeStatusReporter) Info(message string) {
+	if r.home == nil {
+		return
+	}
+	r.home.showStatusInfo(message)
+}
+
+func (r homeStatusReporter) Error(message string) {
+	if r.home == nil {
+		return
+	}
+	r.home.showStatusError(message)
 }
 
 func (home *Home) toggleLeftWrapper() {

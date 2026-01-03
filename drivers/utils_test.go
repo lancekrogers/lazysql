@@ -7,7 +7,7 @@ import (
 
 	gomock "github.com/DATA-DOG/go-sqlmock"
 
-	"github.com/jorgerojas26/lazysql/models"
+	"github.com/lancekrogers/lazysql/models"
 )
 
 func Test_queriesInTransaction(t *testing.T) {

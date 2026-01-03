@@ -9,7 +9,7 @@ import (
 
 	"github.com/xo/dburl"
 
-	"github.com/jorgerojas26/lazysql/models"
+	"github.com/lancekrogers/lazysql/models"
 )
 
 type MySQL struct {

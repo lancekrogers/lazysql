@@ -9,9 +9,9 @@ import (
 
 	"github.com/BurntSushi/toml"
 
-	"github.com/jorgerojas26/lazysql/app"
-	"github.com/jorgerojas26/lazysql/helpers/logger"
-	"github.com/jorgerojas26/lazysql/models"
+	"github.com/lancekrogers/lazysql/app"
+	"github.com/lancekrogers/lazysql/helpers/logger"
+	"github.com/lancekrogers/lazysql/models"
 )
 
 const (

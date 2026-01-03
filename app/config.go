@@ -8,8 +8,8 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 
-	"github.com/jorgerojas26/lazysql/drivers"
-	"github.com/jorgerojas26/lazysql/models"
+	"github.com/lancekrogers/lazysql/drivers"
+	"github.com/lancekrogers/lazysql/models"
 )
 
 type Config struct {

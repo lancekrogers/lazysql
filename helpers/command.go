@@ -11,7 +11,7 @@ import (
 
 	"github.com/mitchellh/go-linereader"
 
-	"github.com/jorgerojas26/lazysql/helpers/logger"
+	"github.com/lancekrogers/lazysql/helpers/logger"
 )
 
 // [doneFn] is invoked when the [command] is completed with its stdout.
