@@ -13,6 +13,7 @@ import (
 	"github.com/jorgerojas26/lazysql/drivers"
 	"github.com/jorgerojas26/lazysql/helpers/logger"
 	"github.com/jorgerojas26/lazysql/internal/history"
+	"github.com/jorgerojas26/lazysql/internal/vim/modes"
 	"github.com/jorgerojas26/lazysql/models"
 )
 
@@ -26,6 +27,8 @@ type Home struct {
 	leftWrapperVisible   bool
 	treePinned           bool
 	HelpStatus           HelpStatus
+	ModeManager          *modes.ModeManager
+	ModeIndicator        *modes.ModeIndicator
 	HelpModal            *HelpModal
 	QueryHistoryModal    *QueryHistoryModal
 	DBDriver             drivers.Driver
@@ -53,6 +56,9 @@ func NewHomePage(connection models.Connection, dbdriver drivers.Driver) *Home {
 		}
 	}
 
+	modeManager := modes.NewManager()
+	modeIndicator := modes.NewModeIndicator(modeManager)
+
 	home := &Home{
 		Flex:               tview.NewFlex().SetDirection(tview.FlexRow),
 		Tree:               tree,
@@ -62,6 +68,8 @@ func NewHomePage(connection models.Connection, dbdriver drivers.Driver) *Home {
 		leftWrapperVisible: true,
 		treePinned:         true,
 		HelpStatus:         NewHelpStatus(),
+		ModeManager:        modeManager,
+		ModeIndicator:      modeIndicator,
 		HelpModal:          NewHelpModal(),
 
 		DBDriver:             dbdriver,
@@ -108,8 +116,12 @@ func NewHomePage(connection models.Connection, dbdriver drivers.Driver) *Home {
 	maincontent.AddItem(leftWrapper, 30, 1, false)
 	maincontent.AddItem(rightWrapper, 0, 5, false)
 
+	statusBar := tview.NewFlex().SetDirection(tview.FlexColumn)
+	statusBar.AddItem(home.HelpStatus, 0, 1, false)
+	statusBar.AddItem(home.ModeIndicator, 14, 0, false)
+
 	home.AddItem(maincontent, 0, 1, false)
-	// home.AddItem(home.HelpStatus, 1, 1, false)
+	home.AddItem(statusBar, 1, 0, false)
 
 	home.SetInputCapture(home.homeInputCapture)
 
