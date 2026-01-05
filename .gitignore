@@ -6,3 +6,4 @@ dist/
 test.db
 
 .aider*
+coverage.out

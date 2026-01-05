@@ -66,7 +66,7 @@ func NewHomePage(connection models.Connection, dbdriver drivers.Driver) *Home {
 
 	modeManager := modes.NewManager()
 	modeIndicator := modes.NewModeIndicator(modeManager)
-	commandLine := cmdline.NewCommandLine(app.App, cmdline.NewCommandHistory(100))
+	commandLine := cmdline.NewCommandLine(app.App.Application, cmdline.NewCommandHistory(100))
 	commandLine.SetContext(app.App.Context())
 	bufferManager := buffer.NewManager()
 	statusLine := NewStatusLine()

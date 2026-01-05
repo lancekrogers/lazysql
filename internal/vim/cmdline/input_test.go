@@ -2,6 +2,7 @@ package cmdline
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/gdamore/tcell/v2"
@@ -17,6 +18,16 @@ func (e *captureExecutor) Execute(ctx context.Context, command string) error {
 	e.ctx = ctx
 	e.commands = append(e.commands, command)
 	return nil
+}
+
+type errorExecutor struct {
+	err     error
+	lastCtx context.Context
+}
+
+func (e *errorExecutor) Execute(ctx context.Context, _ string) error {
+	e.lastCtx = ctx
+	return e.err
 }
 
 func TestCommandLineExecuteAndFocus(t *testing.T) {
@@ -72,6 +83,62 @@ func TestCommandLineHistoryKeys(t *testing.T) {
 	}
 }
 
+func TestCommandLineCallbacksAndContext(t *testing.T) {
+	app := tview.NewApplication()
+	dummy := tview.NewBox()
+	app.SetRoot(dummy, true)
+	app.SetFocus(dummy)
+
+	commandLine := NewCommandLine(app, NewCommandHistory(10))
+	exec := &errorExecutor{err: errors.New("boom")}
+	commandLine.SetExecutor(exec)
+
+	commandLine.SetOnShow(nil)
+	commandLine.SetOnHide(nil)
+	commandLine.SetOnError(nil)
+	commandLine.SetOnCancel(nil)
+
+	showCount := 0
+	hideCount := 0
+	errorCount := 0
+	commandLine.SetOnShow(func() {
+		showCount++
+	})
+	commandLine.SetOnHide(func() {
+		hideCount++
+	})
+	commandLine.SetOnError(func(err error) {
+		if err != nil {
+			errorCount++
+		}
+	})
+
+	ctx := context.WithValue(context.Background(), "ctx-key", "ctx-value")
+	commandLine.SetContext(ctx)
+	commandLine.Activate()
+	commandLine.SetText("w test.sql")
+	commandLine.handleDone(tcell.KeyEnter)
+
+	if showCount != 1 || hideCount != 1 {
+		t.Fatalf("expected show/hide to fire once, got show=%d hide=%d", showCount, hideCount)
+	}
+	if errorCount != 1 {
+		t.Fatalf("expected onError to fire once, got %d", errorCount)
+	}
+	if exec.lastCtx == nil || exec.lastCtx.Value("ctx-key") != "ctx-value" {
+		t.Fatal("expected context to be passed to executor")
+	}
+
+	exec.err = nil
+	commandLine.SetContext(nil)
+	commandLine.Activate()
+	commandLine.SetText("w other.sql")
+	commandLine.handleDone(tcell.KeyEnter)
+	if exec.lastCtx == nil || exec.lastCtx.Value("ctx-key") != nil {
+		t.Fatal("expected context to reset to background")
+	}
+}
+
 func TestCommandLineCancel(t *testing.T) {
 	app := tview.NewApplication()
 	commandLine := NewCommandLine(app, NewCommandHistory(10))
@@ -83,5 +150,17 @@ func TestCommandLineCancel(t *testing.T) {
 	commandLine.handleDone(tcell.KeyEscape)
 	if !canceled {
 		t.Fatal("expected cancel callback to fire")
+	}
+}
+
+func TestCommandLineInputDefault(t *testing.T) {
+	commandLine := NewCommandLine(tview.NewApplication(), NewCommandHistory(10))
+	if event := commandLine.handleInput(nil); event != nil {
+		t.Fatal("expected nil event to remain nil")
+	}
+
+	event := tcell.NewEventKey(tcell.KeyRune, 'x', tcell.ModNone)
+	if got := commandLine.handleInput(event); got != event {
+		t.Fatal("expected non-navigation key to pass through")
 	}
 }

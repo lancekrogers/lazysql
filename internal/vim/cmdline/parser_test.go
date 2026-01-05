@@ -12,6 +12,7 @@ func TestParseInvocation(t *testing.T) {
 		{input: ":w file.sql", name: "w", force: false, args: []string{"file.sql"}},
 		{input: "w!", name: "w", force: true, args: nil},
 		{input: "wq! file.sql", name: "wq", force: true, args: []string{"file.sql"}},
+		{input: "w ! file.sql", name: "w", force: true, args: []string{"file.sql"}},
 		{input: "e \"file name.sql\"", name: "e", force: false, args: []string{"file name.sql"}},
 	}
 
@@ -31,6 +32,16 @@ func TestParseInvocation(t *testing.T) {
 				t.Fatalf("parse %q: expected arg %q, got %q", tc.input, arg, inv.Args[i])
 			}
 		}
+	}
+}
+
+func TestParseInvocationEmpty(t *testing.T) {
+	inv, err := ParseInvocation("   ")
+	if err != nil {
+		t.Fatalf("parse empty: %v", err)
+	}
+	if inv.Name != "" || inv.Raw != "" || inv.Force || len(inv.Args) != 0 {
+		t.Fatalf("expected empty invocation, got %+v", inv)
 	}
 }
 
