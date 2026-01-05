@@ -1,6 +1,7 @@
 package components
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -667,6 +668,89 @@ func (table *ResultsTable) subscribeToFilterChanges() {
 	}
 }
 
+func (table *ResultsTable) ExecuteEditorQuery(query string) error {
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return nil
+	}
+	if table.Editor == nil {
+		return errors.New("editor not initialized")
+	}
+
+	queryLower := strings.ToLower(query)
+	queryTrimmed := strings.TrimSpace(queryLower)
+
+	isSelect := strings.HasPrefix(queryTrimmed, "select") ||
+		strings.HasPrefix(queryTrimmed, "with") ||
+		strings.HasPrefix(queryTrimmed, "explain") ||
+		strings.HasPrefix(queryTrimmed, "show") ||
+		strings.HasPrefix(queryTrimmed, "describe") ||
+		strings.HasPrefix(queryTrimmed, "desc")
+
+	if isSelect {
+		table.SetLoading(true)
+		App.Draw()
+
+		rows, records, err := table.DBDriver.ExecuteQuery(query)
+		table.Pagination.SetTotalRecords(records)
+		table.Pagination.SetLimit(records)
+
+		if err != nil {
+			table.SetLoading(false)
+			table.SetError(err.Error(), nil)
+			App.Draw()
+			return err
+		}
+
+		table.UpdateRows(rows)
+		table.SetLoading(false)
+		table.SetIsFiltering(false)
+		table.HighlightTable()
+		table.Editor.SetBlur()
+		table.SetInputCapture(table.tableInputCapture)
+		if table.EditorPages != nil {
+			table.EditorPages.SwitchToPage(pageNameTableEditorTable)
+		}
+		App.SetFocus(table)
+		if err := history.AddQueryToHistory(table.connectionIdentifier, query); err != nil {
+			logger.Error("Failed to add SELECT query to history", map[string]any{"error": err, "query": query, "connection": table.connectionIdentifier})
+		}
+		App.Draw()
+		return nil
+	}
+
+	if table.ReadOnly {
+		if err := drivers.ValidateQueryForReadOnly(query); err != nil {
+			table.SetError("Cannot execute mutation query: Connection is in read-only mode", nil)
+			return err
+		}
+	}
+
+	table.SetRecords([][]string{})
+	table.SetLoading(true)
+	App.Draw()
+
+	result, err := table.DBDriver.ExecuteDMLStatement(query)
+	if err != nil {
+		table.SetLoading(false)
+		App.Draw()
+		table.SetError(err.Error(), nil)
+		return err
+	}
+
+	table.SetResultsInfo(result)
+	table.SetLoading(false)
+	if table.EditorPages != nil {
+		table.EditorPages.SwitchToPage(pageNameTableEditorResultsInfo)
+	}
+	App.SetFocus(table.Editor)
+	if err := history.AddQueryToHistory(table.connectionIdentifier, query); err != nil {
+		logger.Error("Failed to add DML query to history", map[string]any{"error": err, "query": query, "connection": table.connectionIdentifier})
+	}
+	App.Draw()
+	return nil
+}
+
 func (table *ResultsTable) subscribeToEditorChanges() {
 	ch := table.Editor.Subscribe()
 
@@ -674,77 +758,7 @@ func (table *ResultsTable) subscribeToEditorChanges() {
 		switch stateChange.Key {
 		case eventSQLEditorQuery:
 			query := stateChange.Value.(string)
-			if query != "" {
-				queryLower := strings.ToLower(query)
-				queryTrimmed := strings.TrimSpace(queryLower)
-
-				// Check if query STARTS with SELECT (not just contains it)
-				// This prevents DELETE...WHERE id IN (SELECT...) from being treated as SELECT
-				isSelect := strings.HasPrefix(queryTrimmed, "select") ||
-					strings.HasPrefix(queryTrimmed, "with") ||
-					strings.HasPrefix(queryTrimmed, "explain") ||
-					strings.HasPrefix(queryTrimmed, "show") ||
-					strings.HasPrefix(queryTrimmed, "describe") ||
-					strings.HasPrefix(queryTrimmed, "desc")
-
-				if isSelect {
-					table.SetLoading(true)
-					App.Draw()
-
-					rows, records, err := table.DBDriver.ExecuteQuery(query)
-					table.Pagination.SetTotalRecords(records)
-					table.Pagination.SetLimit(records)
-
-					if err != nil {
-						table.SetLoading(false)
-						table.SetError(err.Error(), nil)
-						App.Draw()
-					} else {
-						table.UpdateRows(rows)
-						table.SetLoading(false)
-						table.SetIsFiltering(false)
-						table.HighlightTable()
-						table.Editor.SetBlur()
-						table.SetInputCapture(table.tableInputCapture)
-						table.EditorPages.SwitchToPage(pageNameTableEditorTable)
-						App.SetFocus(table)
-						// Add successful SELECT query to history
-						if err := history.AddQueryToHistory(table.connectionIdentifier, query); err != nil {
-							logger.Error("Failed to add SELECT query to history", map[string]any{"error": err, "query": query, "connection": table.connectionIdentifier})
-						}
-						App.Draw()
-					}
-				} else {
-					if table.ReadOnly {
-						if err := drivers.ValidateQueryForReadOnly(query); err != nil {
-							table.SetError("Cannot execute mutation query: Connection is in read-only mode", nil)
-							return
-						}
-					}
-
-					table.SetRecords([][]string{})
-					table.SetLoading(true)
-					App.Draw()
-
-					result, err := table.DBDriver.ExecuteDMLStatement(query)
-
-					if err != nil {
-						table.SetLoading(false)
-						App.Draw()
-						table.SetError(err.Error(), nil)
-					} else {
-						table.SetResultsInfo(result)
-						table.SetLoading(false)
-						table.EditorPages.SwitchToPage(pageNameTableEditorResultsInfo)
-						App.SetFocus(table.Editor)
-						// Add successful DML query to history
-						if err := history.AddQueryToHistory(table.connectionIdentifier, query); err != nil {
-							logger.Error("Failed to add DML query to history", map[string]any{"error": err, "query": query, "connection": table.connectionIdentifier})
-						}
-						App.Draw()
-					}
-				}
-			}
+			_ = table.ExecuteEditorQuery(query)
 		case eventSQLEditorEscape:
 			table.SetIsFiltering(false)
 			App.SetFocus(table)
@@ -764,6 +778,22 @@ func (table *ResultsTable) GetRecords() [][]string {
 
 func (table *ResultsTable) GetIndexes() [][]string {
 	return table.state.indexes
+}
+
+func (table *ResultsTable) ShowColumns() {
+	if table.Menu == nil {
+		return
+	}
+	table.Menu.SetSelectedOption(2)
+	table.UpdateRows(table.GetColumns())
+}
+
+func (table *ResultsTable) ShowIndexes() {
+	if table.Menu == nil {
+		return
+	}
+	table.Menu.SetSelectedOption(5)
+	table.UpdateRows(table.GetIndexes())
 }
 
 func (table *ResultsTable) GetColumns() [][]string {

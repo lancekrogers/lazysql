@@ -1,6 +1,7 @@
 package components
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -13,10 +14,14 @@ import (
 	"github.com/lancekrogers/lazysql/drivers"
 	"github.com/lancekrogers/lazysql/helpers/logger"
 	"github.com/lancekrogers/lazysql/internal/history"
+	"github.com/lancekrogers/lazysql/internal/ui"
 	"github.com/lancekrogers/lazysql/internal/vim/buffer"
 	"github.com/lancekrogers/lazysql/internal/vim/cmdline"
 	cmdlinecommands "github.com/lancekrogers/lazysql/internal/vim/cmdline/commands"
+	"github.com/lancekrogers/lazysql/internal/vim/leader"
 	"github.com/lancekrogers/lazysql/internal/vim/modes"
+	"github.com/lancekrogers/lazysql/internal/vim/namespace"
+	"github.com/lancekrogers/lazysql/internal/vim/whichkey"
 	"github.com/lancekrogers/lazysql/models"
 )
 
@@ -37,6 +42,16 @@ type Home struct {
 	StatusLine           *StatusLine
 	BufferManager        *buffer.Manager
 	BufferController     *BufferController
+	BufferNavigator      *buffer.Navigator
+	BufferPicker         *BufferPicker
+	ShellPane            *ui.ShellPane
+	ShellHistoryModal    *ShellHistoryModal
+	ContentPages         *tview.Pages
+	StatusBar            *tview.Flex
+	LeaderRegistry       *leader.Registry
+	NamespaceRegistry    *namespace.Registry
+	LeaderManager        *leader.Manager
+	LeaderOverlay        *whichkey.WhichKeyOverlay
 	HelpModal            *HelpModal
 	QueryHistoryModal    *QueryHistoryModal
 	DBDriver             drivers.Driver
@@ -69,7 +84,13 @@ func NewHomePage(connection models.Connection, dbdriver drivers.Driver) *Home {
 	commandLine := cmdline.NewCommandLine(app.App.Application, cmdline.NewCommandHistory(100))
 	commandLine.SetContext(app.App.Context())
 	bufferManager := buffer.NewManager()
+	bufferNavigator := buffer.NewNavigator(bufferManager)
+	bufferPicker := NewBufferPicker(bufferManager)
+	shellPane := ui.NewShellPane()
 	statusLine := NewStatusLine()
+	leaderRegistry := leader.NewRegistry()
+	leaderOverlay := whichkey.NewOverlay(app.App.Application)
+	leaderOverlay.SetPosition(whichkey.PositionBottomRight)
 
 	home := &Home{
 		Flex:               tview.NewFlex().SetDirection(tview.FlexRow),
@@ -85,6 +106,11 @@ func NewHomePage(connection models.Connection, dbdriver drivers.Driver) *Home {
 		CommandLine:        commandLine,
 		StatusLine:         statusLine,
 		BufferManager:      bufferManager,
+		BufferNavigator:    bufferNavigator,
+		BufferPicker:       bufferPicker,
+		ShellPane:          shellPane,
+		LeaderRegistry:     leaderRegistry,
+		LeaderOverlay:      leaderOverlay,
 		HelpModal:          NewHelpModal(),
 
 		DBDriver:             dbdriver,
@@ -92,6 +118,34 @@ func NewHomePage(connection models.Connection, dbdriver drivers.Driver) *Home {
 		ConnectionIdentifier: connectionIdentifier,
 		ConnectionURL:        connection.URL,
 		ReadOnly:             connection.ReadOnly,
+	}
+
+	shellPane.SetOnExecute(home.executeShellQuery)
+
+	shellHistoryModal := NewShellHistoryModal(connectionIdentifier, func(selectedQuery string) {
+		if err := home.showShellPane(); err != nil {
+			home.showStatusError(err.Error())
+			return
+		}
+		if home.ShellPane != nil {
+			home.ShellPane.SetInputText(selectedQuery)
+			app.App.SetFocus(home.ShellPane.Input())
+		}
+	})
+	home.ShellHistoryModal = shellHistoryModal
+
+	leaderManager := leader.NewManager(leaderRegistry, leaderOverlay, leader.ConfigFromApp(app.App.Config()).Timeout, homeStatusReporter{home: home})
+	home.LeaderManager = leaderManager
+
+	bufferNamespace := namespace.NewBufferNamespace(bufferManager, bufferNavigator, bufferPicker)
+	shellNamespace := namespace.NewShellNamespace(home)
+	runNamespace := namespace.NewRunNamespace(home)
+	describeNamespace := namespace.NewDescribeNamespace(home)
+	namespaceRegistry, err := namespace.Initialize(leaderRegistry, bufferNamespace, shellNamespace, runNamespace, describeNamespace)
+	if err != nil {
+		logger.Error("Failed to initialize namespaces", map[string]any{"error": err})
+	} else {
+		home.NamespaceRegistry = namespaceRegistry
 	}
 
 	tabbedPane := NewTabbedPane()
@@ -131,6 +185,11 @@ func NewHomePage(connection models.Connection, dbdriver drivers.Driver) *Home {
 	maincontent.AddItem(leftWrapper, 30, 1, false)
 	maincontent.AddItem(rightWrapper, 0, 5, false)
 
+	contentPages := tview.NewPages()
+	contentPages.AddPage(pageNameHomeContent, maincontent, true, true)
+	contentPages.AddPage(pageNameWhichKeyOverlay, leaderOverlay, true, true)
+	home.ContentPages = contentPages
+
 	statusBar := tview.NewFlex().SetDirection(tview.FlexColumn)
 	statusPages := tview.NewPages()
 	statusPages.AddPage(pageNameStatusHelp, home.HelpStatus, true, true)
@@ -149,6 +208,7 @@ func NewHomePage(connection models.Connection, dbdriver drivers.Driver) *Home {
 
 	statusBar.AddItem(statusPages, 0, 1, false)
 	statusBar.AddItem(home.ModeIndicator, 14, 0, false)
+	home.StatusBar = statusBar
 
 	commandLine.SetOnError(func(err error) {
 		if err != nil {
@@ -172,8 +232,7 @@ func NewHomePage(connection models.Connection, dbdriver drivers.Driver) *Home {
 	})
 	commandLine.SetExecutor(executor)
 
-	home.AddItem(maincontent, 0, 1, false)
-	home.AddItem(statusBar, 1, 0, false)
+	home.layoutMain()
 
 	home.SetInputCapture(home.homeInputCapture)
 
@@ -481,6 +540,12 @@ func (home *Home) rightWrapperInputCapture(event *tcell.EventKey) *tcell.EventKe
 }
 
 func (home *Home) homeInputCapture(event *tcell.EventKey) *tcell.EventKey {
+	if home.LeaderManager != nil && home.shouldHandleLeader(event) {
+		if home.LeaderManager.HandleEvent(event) {
+			return nil
+		}
+	}
+
 	tab := home.TabbedPane.GetCurrentTab()
 
 	var table *ResultsTable
@@ -584,6 +649,37 @@ func (home *Home) homeInputCapture(event *tcell.EventKey) *tcell.EventKey {
 	return event
 }
 
+func (home *Home) shouldHandleLeader(event *tcell.EventKey) bool {
+	if event == nil {
+		return false
+	}
+
+	focus := app.App.GetFocus()
+	if focus == nil {
+		return true
+	}
+
+	if focus == home.CommandLine {
+		return false
+	}
+
+	if _, ok := focus.(*tview.InputField); ok {
+		return false
+	}
+
+	if home.ModeManager != nil && home.ModeManager.Mode() == modes.ModeInsert {
+		tab := home.TabbedPane.GetCurrentTab()
+		if tab != nil {
+			table, ok := tab.Content.(*ResultsTable)
+			if ok && table.Editor != nil && focus == table.Editor {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
 func (home *Home) createOrFocusEditorTab() {
 	tab := home.TabbedPane.GetTabByName(tabNameEditor)
 
@@ -592,7 +688,7 @@ func (home *Home) createOrFocusEditorTab() {
 		table := tab.Content.(*ResultsTable)
 		table.SetIsFiltering(true)
 		if table.Editor != nil {
-			table.Editor.EnableVim(home.ModeManager, nil, home.CommandLine)
+			table.Editor.EnableVim(home.ModeManager, home.LeaderManager, home.CommandLine)
 			if home.BufferController == nil {
 				home.BufferController = NewBufferController(home.BufferManager, table.Editor)
 			}
@@ -602,7 +698,7 @@ func (home *Home) createOrFocusEditorTab() {
 		home.TabbedPane.AppendTab(tabNameEditor, tableWithEditor, tabNameEditor)
 		tableWithEditor.SetIsFiltering(true)
 		if tableWithEditor.Editor != nil {
-			tableWithEditor.Editor.EnableVim(home.ModeManager, nil, home.CommandLine)
+			tableWithEditor.Editor.EnableVim(home.ModeManager, home.LeaderManager, home.CommandLine)
 			if home.BufferController == nil {
 				home.BufferController = NewBufferController(home.BufferManager, tableWithEditor.Editor)
 			}
@@ -671,4 +767,252 @@ func (home *Home) toggleLeftWrapper() {
 		home.focusLeftWrapper()
 	}
 	app.App.ForceDraw()
+}
+
+func (home *Home) layoutMain() {
+	home.Clear()
+	if home.ContentPages != nil {
+		home.AddItem(home.ContentPages, 0, 1, false)
+	}
+	if home.ShellPane != nil && home.ShellPane.IsVisible() {
+		home.AddItem(home.ShellPane, home.ShellPane.Height(), 0, false)
+	}
+	if home.StatusBar != nil {
+		home.AddItem(home.StatusBar, 1, 0, false)
+	}
+}
+
+func (home *Home) shellPane() (*ui.ShellPane, error) {
+	if home == nil || home.ShellPane == nil {
+		return nil, errors.New("shell pane not configured")
+	}
+	return home.ShellPane, nil
+}
+
+func (home *Home) isShellFocused() bool {
+	if home == nil || home.ShellPane == nil {
+		return false
+	}
+	focus := app.App.GetFocus()
+	if focus == nil {
+		return false
+	}
+	return focus == home.ShellPane || focus == home.ShellPane.Input() || focus == home.ShellPane.Output()
+}
+
+func (home *Home) setShellVisible(visible bool) error {
+	pane, err := home.shellPane()
+	if err != nil {
+		return err
+	}
+	wasFocused := home.isShellFocused()
+	if visible {
+		pane.Show()
+	} else {
+		pane.Hide()
+	}
+	home.layoutMain()
+	if !visible && wasFocused {
+		home.focusRightWrapper()
+	}
+	app.App.ForceDraw()
+	return nil
+}
+
+func (home *Home) showShellPane() error {
+	return home.setShellVisible(true)
+}
+
+func (home *Home) hideShellPane() error {
+	return home.setShellVisible(false)
+}
+
+func (home *Home) ToggleShell() error {
+	pane, err := home.shellPane()
+	if err != nil {
+		return err
+	}
+	if pane.IsVisible() {
+		return home.hideShellPane()
+	}
+	return home.showShellPane()
+}
+
+func (home *Home) CloseShell() error {
+	return home.hideShellPane()
+}
+
+func (home *Home) FocusShellInput() error {
+	if err := home.showShellPane(); err != nil {
+		return err
+	}
+	if home.ShellPane != nil {
+		app.App.SetFocus(home.ShellPane.Input())
+	}
+	return nil
+}
+
+func (home *Home) ClearShellOutput() error {
+	pane, err := home.shellPane()
+	if err != nil {
+		return err
+	}
+	pane.ClearOutput()
+	app.App.ForceDraw()
+	return nil
+}
+
+func (home *Home) ResizeShell() error {
+	pane, err := home.shellPane()
+	if err != nil {
+		return err
+	}
+	if !pane.IsVisible() {
+		if err := home.showShellPane(); err != nil {
+			return err
+		}
+	}
+	heights := []int{10, 15, 25}
+	current := pane.Height()
+	next := heights[0]
+	for i, height := range heights {
+		if height == current {
+			next = heights[(i+1)%len(heights)]
+			break
+		}
+	}
+	pane.SetHeight(next)
+	home.layoutMain()
+	app.App.ForceDraw()
+	return nil
+}
+
+func (home *Home) ShowShellHistory() error {
+	if home.ShellHistoryModal == nil {
+		return errors.New("shell history modal not configured")
+	}
+	if mainPages == nil {
+		return errors.New("pages not configured")
+	}
+	if mainPages.HasPage(pageNameShellHistory) {
+		mainPages.SwitchToPage(pageNameShellHistory)
+	} else {
+		mainPages.AddPage(pageNameShellHistory, home.ShellHistoryModal, true, true)
+	}
+	home.ShellHistoryModal.LoadHistory(home.ConnectionIdentifier)
+	app.App.SetFocus(home.ShellHistoryModal.GetPrimitive())
+	return nil
+}
+
+func (home *Home) executeShellQuery(query string) {
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return
+	}
+	pane, err := home.shellPane()
+	if err != nil {
+		home.showStatusError(err.Error())
+		return
+	}
+	if home.DBDriver == nil {
+		home.appendShellError(pane, errors.New("database driver not configured"))
+		return
+	}
+
+	if home.ReadOnly {
+		if err := drivers.ValidateQueryForReadOnly(query); err != nil {
+			home.appendShellError(pane, err)
+			return
+		}
+	}
+
+	if isSelectQuery(query) {
+		rows, _, err := home.DBDriver.ExecuteQuery(query)
+		if err != nil {
+			home.appendShellError(pane, err)
+			return
+		}
+		pane.AppendOutput(formatShellRows(rows))
+	} else {
+		result, err := home.DBDriver.ExecuteDMLStatement(query)
+		if err != nil {
+			home.appendShellError(pane, err)
+			return
+		}
+		pane.AppendOutput(result)
+	}
+
+	if err := history.AddQueryToHistory(home.ConnectionIdentifier, query); err != nil {
+		logger.Error("Failed to add shell query to history", map[string]any{"error": err, "query": query, "connection": home.ConnectionIdentifier})
+	}
+	app.App.ForceDraw()
+}
+
+func (home *Home) appendShellError(pane *ui.ShellPane, err error) {
+	if err == nil {
+		return
+	}
+	if pane != nil {
+		pane.AppendOutput(fmt.Sprintf("Error: %s", err.Error()))
+	}
+	home.showStatusError(err.Error())
+	app.App.ForceDraw()
+}
+
+func isSelectQuery(query string) bool {
+	queryLower := strings.ToLower(strings.TrimSpace(query))
+	return strings.HasPrefix(queryLower, "select") ||
+		strings.HasPrefix(queryLower, "with") ||
+		strings.HasPrefix(queryLower, "explain") ||
+		strings.HasPrefix(queryLower, "show") ||
+		strings.HasPrefix(queryLower, "describe") ||
+		strings.HasPrefix(queryLower, "desc")
+}
+
+func formatShellRows(rows [][]string) string {
+	if len(rows) == 0 {
+		return "No results."
+	}
+	widths := make([]int, len(rows[0]))
+	for _, row := range rows {
+		for i, cell := range row {
+			if i >= len(widths) {
+				continue
+			}
+			if len(cell) > widths[i] {
+				widths[i] = len(cell)
+			}
+		}
+	}
+
+	var builder strings.Builder
+	for rowIndex, row := range rows {
+		for colIndex, cell := range row {
+			if colIndex > 0 {
+				builder.WriteString(" | ")
+			}
+			builder.WriteString(padRight(cell, widths[colIndex]))
+		}
+		if rowIndex == 0 {
+			builder.WriteString("\n")
+			for colIndex, width := range widths {
+				if colIndex > 0 {
+					builder.WriteString("-+-")
+				}
+				builder.WriteString(strings.Repeat("-", width))
+			}
+		}
+		if rowIndex < len(rows)-1 {
+			builder.WriteString("\n")
+		}
+	}
+
+	return builder.String()
+}
+
+func padRight(text string, width int) string {
+	if width <= len(text) {
+		return text
+	}
+	return text + strings.Repeat(" ", width-len(text))
 }

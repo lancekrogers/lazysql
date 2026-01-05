@@ -371,7 +371,7 @@ func (w *WhichKeyOverlay) syncFromTree() {
 			}
 		}
 		hints = append(hints, KeyHint{
-			Key:         string(key),
+			Key:         formatKeyLabel(key),
 			Description: description,
 			IsGroup:     isGroup,
 		})

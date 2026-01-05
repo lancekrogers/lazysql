@@ -20,6 +20,10 @@ const (
 	pageNameStatusHelp        string = "StatusHelp"
 	pageNameStatusCommandLine string = "StatusCommandLine"
 	pageNameStatusMessage     string = "StatusMessage"
+	pageNameBufferPicker      string = "BufferPicker"
+	pageNameHomeContent       string = "HomeContent"
+	pageNameWhichKeyOverlay   string = "WhichKeyOverlay"
+	pageNameDescribePicker    string = "DescribePicker"
 
 	// Results table
 	pageNameTable                  string = "Table"
@@ -43,8 +47,10 @@ const (
 
 	// Query History
 	pageNameQueryHistory     string = "QueryHistoryModal"
+	pageNameShellHistory     string = "ShellHistoryModal"
 	pageNameSaveQuery        string = "SaveQueryModal"
 	pageNameSavedQueryDelete string = "SavedQueryDeleteModal"
+	pageNameRunParams        string = "RunParamsModal"
 )
 
 // Tabs

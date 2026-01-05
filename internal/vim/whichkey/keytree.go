@@ -85,7 +85,7 @@ func (t *KeyTree) Path() []rune {
 func (t *KeyTree) Breadcrumb(leader rune) string {
 	parts := []string{string(leader)}
 	for _, key := range t.Path() {
-		parts = append(parts, string(key))
+		parts = append(parts, formatKeyLabel(key))
 	}
 	return strings.Join(parts, " > ") + " > "
 }
