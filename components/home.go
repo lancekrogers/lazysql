@@ -44,6 +44,8 @@ type Home struct {
 	BufferController     *BufferController
 	BufferNavigator      *buffer.Navigator
 	BufferPicker         *BufferPicker
+	FindPicker           *FindPicker
+	findHistory          *findHistory
 	ShellPane            *ui.ShellPane
 	ShellHistoryModal    *ShellHistoryModal
 	ContentPages         *tview.Pages
@@ -86,6 +88,7 @@ func NewHomePage(connection models.Connection, dbdriver drivers.Driver) *Home {
 	bufferManager := buffer.NewManager()
 	bufferNavigator := buffer.NewNavigator(bufferManager)
 	bufferPicker := NewBufferPicker(bufferManager)
+	findPicker := NewFindPicker()
 	shellPane := ui.NewShellPane()
 	statusLine := NewStatusLine()
 	leaderRegistry := leader.NewRegistry()
@@ -108,6 +111,8 @@ func NewHomePage(connection models.Connection, dbdriver drivers.Driver) *Home {
 		BufferManager:      bufferManager,
 		BufferNavigator:    bufferNavigator,
 		BufferPicker:       bufferPicker,
+		FindPicker:         findPicker,
+		findHistory:        newFindHistory(50),
 		ShellPane:          shellPane,
 		LeaderRegistry:     leaderRegistry,
 		LeaderOverlay:      leaderOverlay,
@@ -141,7 +146,8 @@ func NewHomePage(connection models.Connection, dbdriver drivers.Driver) *Home {
 	shellNamespace := namespace.NewShellNamespace(home)
 	runNamespace := namespace.NewRunNamespace(home)
 	describeNamespace := namespace.NewDescribeNamespace(home)
-	namespaceRegistry, err := namespace.Initialize(leaderRegistry, bufferNamespace, shellNamespace, runNamespace, describeNamespace)
+	findNamespace := namespace.NewFindNamespace(home)
+	namespaceRegistry, err := namespace.Initialize(leaderRegistry, bufferNamespace, shellNamespace, runNamespace, describeNamespace, findNamespace)
 	if err != nil {
 		logger.Error("Failed to initialize namespaces", map[string]any{"error": err})
 	} else {

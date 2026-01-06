@@ -24,6 +24,7 @@ const (
 	pageNameHomeContent       string = "HomeContent"
 	pageNameWhichKeyOverlay   string = "WhichKeyOverlay"
 	pageNameDescribePicker    string = "DescribePicker"
+	pageNameFindPicker        string = "FindPicker"
 
 	// Results table
 	pageNameTable                  string = "Table"
