@@ -40,6 +40,7 @@ type Home struct {
 	CommandLine          *cmdline.CommandLine
 	StatusPages          *tview.Pages
 	StatusLine           *StatusLine
+	ConnectionIndicator  *ConnectionIndicator
 	BufferManager        *buffer.Manager
 	BufferController     *BufferController
 	BufferNavigator      *buffer.Navigator
@@ -92,32 +93,34 @@ func NewHomePage(connection models.Connection, dbdriver drivers.Driver) *Home {
 	findPicker := NewFindPicker()
 	shellPane := ui.NewShellPane()
 	statusLine := NewStatusLine()
+	connectionIndicator := NewConnectionIndicator()
 	leaderRegistry := leader.NewRegistry()
 	leaderOverlay := whichkey.NewOverlay(app.App.Application)
 	leaderOverlay.SetPosition(whichkey.PositionBottomRight)
 
 	home := &Home{
-		Flex:               tview.NewFlex().SetDirection(tview.FlexRow),
-		Tree:               tree,
-		LeftWrapper:        leftWrapper,
-		RightWrapper:       rightWrapper,
-		MainContent:        maincontent,
-		leftWrapperVisible: true,
-		treePinned:         true,
-		HelpStatus:         NewHelpStatus(),
-		ModeManager:        modeManager,
-		ModeIndicator:      modeIndicator,
-		CommandLine:        commandLine,
-		StatusLine:         statusLine,
-		BufferManager:      bufferManager,
-		BufferNavigator:    bufferNavigator,
-		BufferPicker:       bufferPicker,
-		FindPicker:         findPicker,
-		findHistory:        newFindHistory(50),
-		ShellPane:          shellPane,
-		LeaderRegistry:     leaderRegistry,
-		LeaderOverlay:      leaderOverlay,
-		HelpModal:          NewHelpModal(),
+		Flex:                tview.NewFlex().SetDirection(tview.FlexRow),
+		Tree:                tree,
+		LeftWrapper:         leftWrapper,
+		RightWrapper:        rightWrapper,
+		MainContent:         maincontent,
+		leftWrapperVisible:  true,
+		treePinned:          true,
+		HelpStatus:          NewHelpStatus(),
+		ModeManager:         modeManager,
+		ModeIndicator:       modeIndicator,
+		CommandLine:         commandLine,
+		StatusLine:          statusLine,
+		ConnectionIndicator: connectionIndicator,
+		BufferManager:       bufferManager,
+		BufferNavigator:     bufferNavigator,
+		BufferPicker:        bufferPicker,
+		FindPicker:          findPicker,
+		findHistory:         newFindHistory(50),
+		ShellPane:           shellPane,
+		LeaderRegistry:      leaderRegistry,
+		LeaderOverlay:       leaderOverlay,
+		HelpModal:           NewHelpModal(),
 
 		DBDriver:             dbdriver,
 		ListOfDBChanges:      []models.DBDMLChange{},
@@ -126,6 +129,8 @@ func NewHomePage(connection models.Connection, dbdriver drivers.Driver) *Home {
 		ConnectionDBName:     connection.DBName,
 		ReadOnly:             connection.ReadOnly,
 	}
+
+	connectionIndicator.SetConnection(connectionIdentifier)
 
 	shellPane.SetOnExecute(home.executeShellQuery)
 
@@ -159,7 +164,8 @@ func NewHomePage(connection models.Connection, dbdriver drivers.Driver) *Home {
 	describeNamespace := namespace.NewDescribeNamespace(home)
 	findNamespace := namespace.NewFindNamespace(home)
 	treeNamespace := namespace.NewTreeNamespace(home)
-	namespaceRegistry, err := namespace.Initialize(leaderRegistry, bufferNamespace, shellNamespace, runNamespace, describeNamespace, findNamespace, treeNamespace)
+	workspaceNamespace := namespace.NewWorkspaceNamespace(home)
+	namespaceRegistry, err := namespace.Initialize(leaderRegistry, bufferNamespace, shellNamespace, runNamespace, describeNamespace, findNamespace, treeNamespace, workspaceNamespace)
 	if err != nil {
 		logger.Error("Failed to initialize namespaces", map[string]any{"error": err})
 	} else {
@@ -225,6 +231,7 @@ func NewHomePage(connection models.Connection, dbdriver drivers.Driver) *Home {
 	home.StatusPages = statusPages
 
 	statusBar.AddItem(statusPages, 0, 1, false)
+	statusBar.AddItem(connectionIndicator, 24, 0, false)
 	statusBar.AddItem(home.ModeIndicator, 14, 0, false)
 	home.StatusBar = statusBar
 

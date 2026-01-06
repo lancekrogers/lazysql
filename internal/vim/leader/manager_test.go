@@ -50,6 +50,20 @@ func (f *fakeTreeController) SyncWithBuffer() error {
 	return nil
 }
 
+type fakeWorkspaceController struct {
+	connectCalls int
+	connectErr   error
+}
+
+func (f *fakeWorkspaceController) Connect() error {
+	f.connectCalls++
+	return f.connectErr
+}
+
+func (f *fakeWorkspaceController) SwitchConnection() error { return nil }
+func (f *fakeWorkspaceController) ListConnections() error  { return nil }
+func (f *fakeWorkspaceController) Disconnect() error       { return nil }
+
 type fakeStatusReporter struct {
 	errors []string
 }
@@ -120,6 +134,27 @@ func TestManagerExecutesTreeCommand(t *testing.T) {
 
 	if controller.toggleCalls != 1 {
 		t.Fatalf("expected toggle call, got %d", controller.toggleCalls)
+	}
+	if len(status.errors) != 0 {
+		t.Fatalf("unexpected status errors: %+v", status.errors)
+	}
+}
+
+func TestManagerExecutesWorkspaceCommand(t *testing.T) {
+	registry := leader.NewRegistry()
+	controller := &fakeWorkspaceController{}
+	workspaceNS := namespace.NewWorkspaceNamespace(controller)
+	if _, err := namespace.Initialize(registry, workspaceNS); err != nil {
+		t.Fatalf("initialize namespace: %v", err)
+	}
+
+	status := &fakeStatusReporter{}
+	manager := leader.NewManager(registry, nil, time.Second, status)
+
+	sendRunes(manager, '\\', 'w', 'c')
+
+	if controller.connectCalls != 1 {
+		t.Fatalf("expected connect call, got %d", controller.connectCalls)
 	}
 	if len(status.errors) != 0 {
 		t.Fatalf("unexpected status errors: %+v", status.errors)
