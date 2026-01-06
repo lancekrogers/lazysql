@@ -404,10 +404,12 @@ func (home *Home) runFindAsync(title string, placeholder string, fetch func() ([
 		return err
 	}
 
-	done := App.Register()
 	go func() {
-		defer done()
 		items, err := fetch()
+		ctx := App.Context()
+		if ctx != nil && ctx.Err() != nil {
+			return
+		}
 		App.QueueUpdateDraw(func() {
 			if home.FindPicker != nil {
 				home.FindPicker.SetItems(items)

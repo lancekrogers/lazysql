@@ -116,3 +116,40 @@ func TestFindPickerSelectCurrentTriggersOnSelect(t *testing.T) {
 		t.Fatalf("expected on select to be called once, got %d", called)
 	}
 }
+
+func TestFindPickerDismissRemovesPageAndCallsCancel(t *testing.T) {
+	mainPages = tview.NewPages()
+	picker := NewFindPicker()
+	called := 0
+
+	if err := picker.Show(FindPickerConfig{
+		Title:    "Find",
+		Items:    []FindPickerItem{{Label: "users"}},
+		OnCancel: func() { called++ },
+	}); err != nil {
+		t.Fatalf("expected show to succeed, got %v", err)
+	}
+
+	if !mainPages.HasPage(pageNameFindPicker) {
+		t.Fatal("expected find picker page to exist")
+	}
+
+	picker.dismiss(true)
+	if mainPages.HasPage(pageNameFindPicker) {
+		t.Fatal("expected find picker page to be removed")
+	}
+	if called != 1 {
+		t.Fatalf("expected cancel to be called once, got %d", called)
+	}
+}
+
+func TestFindPickerSelectCurrentWithNoItemsDoesNotPanic(t *testing.T) {
+	mainPages = tview.NewPages()
+	picker := NewFindPicker()
+
+	if err := picker.Show(FindPickerConfig{Title: "Find", Items: nil}); err != nil {
+		t.Fatalf("expected show to succeed, got %v", err)
+	}
+
+	picker.selectCurrent()
+}
