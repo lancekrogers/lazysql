@@ -142,7 +142,11 @@ func openExternalEditor(currentText string, connectionURL string) string {
 		logger.Error("Failed to create temporary file", map[string]any{"error": err.Error()})
 		return currentText
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() {
+		if err := os.Remove(tmpFile.Name()); err != nil {
+			logger.Error("Failed to remove temporary file", map[string]any{"error": err.Error()})
+		}
+	}()
 
 	path := tmpFile.Name()
 	content := []byte(currentText)
@@ -168,11 +172,16 @@ func openExternalEditor(currentText string, connectionURL string) string {
 			return currentText
 		}
 		// Defer unsetting the environment variable to ensure it's cleaned up
-		defer os.Unsetenv("LAZYSQL_CONNECTION_URL")
+		defer func() {
+			if err := os.Unsetenv("LAZYSQL_CONNECTION_URL"); err != nil {
+				logger.Error("Failed to unset environment variable", map[string]any{"error": err.Error()})
+			}
+		}()
 	}
 
 	editor := getEditor()
 
+	// #nosec G204 -- user-configured editor command
 	cmd := exec.Command(editor, path)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
@@ -182,6 +191,7 @@ func openExternalEditor(currentText string, connectionURL string) string {
 		logger.Error("Error executing command", map[string]any{"error": err.Error(), "command": cmd.String()})
 	}
 
+	// #nosec G304 -- reading temporary file created by this function
 	updatedContent, err := os.ReadFile(path)
 	if err != nil {
 		logger.Error("Failed to read from temporary file", map[string]any{"error": err.Error()})
