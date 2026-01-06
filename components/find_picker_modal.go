@@ -32,6 +32,7 @@ type FindPicker struct {
 	list          *tview.List
 	items         []FindPickerItem
 	filteredItems []FindPickerItem
+	loading       bool
 	onCancel      func()
 	previousFocus tview.Primitive
 }
@@ -94,11 +95,9 @@ func (p *FindPicker) Show(config FindPickerConfig) error {
 	if mainPages == nil {
 		return errors.New("main pages not configured")
 	}
-	if len(config.Items) == 0 {
-		return errors.New("no items found")
-	}
 
 	p.onCancel = config.OnCancel
+	p.loading = false
 	p.items = append([]FindPickerItem(nil), config.Items...)
 	p.filteredItems = append([]FindPickerItem(nil), config.Items...)
 
@@ -121,12 +120,20 @@ func (p *FindPicker) Show(config FindPickerConfig) error {
 }
 
 func (p *FindPicker) applyFilter(query string) {
+	if p.loading {
+		p.refreshList()
+		return
+	}
 	p.filteredItems = filterFindItems(p.items, query)
 	p.refreshList()
 }
 
 func (p *FindPicker) refreshList() {
 	p.list.Clear()
+	if p.loading {
+		p.list.AddItem("Loading...", "", 0, nil)
+		return
+	}
 	if len(p.filteredItems) == 0 {
 		p.list.AddItem("No matches", "", 0, nil)
 		return
@@ -167,6 +174,41 @@ func (p *FindPicker) dismiss(callCancel bool) {
 	if callCancel && p.onCancel != nil {
 		p.onCancel()
 	}
+}
+
+func (p *FindPicker) ShowLoading(config FindPickerConfig) error {
+	if mainPages == nil {
+		return errors.New("main pages not configured")
+	}
+
+	p.onCancel = config.OnCancel
+	p.loading = true
+	p.items = nil
+	p.filteredItems = nil
+
+	p.container.SetTitle(fmt.Sprintf(" %s ", config.Title))
+	p.input.SetPlaceholder(config.Placeholder)
+	p.input.SetText("")
+	p.input.SetChangedFunc(func(text string) {
+		p.applyFilter(text)
+	})
+
+	p.refreshList()
+
+	p.previousFocus = App.GetFocus()
+	if mainPages.HasPage(pageNameFindPicker) {
+		mainPages.RemovePage(pageNameFindPicker)
+	}
+	mainPages.AddPage(pageNameFindPicker, p.container, true, true)
+	App.SetFocus(p.input)
+	return nil
+}
+
+func (p *FindPicker) SetItems(items []FindPickerItem) {
+	p.loading = false
+	p.items = append([]FindPickerItem(nil), items...)
+	p.filteredItems = append([]FindPickerItem(nil), items...)
+	p.applyFilter(p.input.GetText())
 }
 
 func filterFindItems(items []FindPickerItem, query string) []FindPickerItem {

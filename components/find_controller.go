@@ -94,59 +94,31 @@ func (o findObject) qualifiedName() string {
 }
 
 func (home *Home) FindTable() error {
-	items, err := home.findTableItems()
-	if err != nil {
-		return err
-	}
-	return home.showFindPicker("Tables", "Find table...", items)
+	return home.runFindAsync("Tables", "Find table...", home.findTableItems)
 }
 
 func (home *Home) FindColumn() error {
-	items, err := home.findColumnItems()
-	if err != nil {
-		return err
-	}
-	return home.showFindPicker("Columns", "Find column...", items)
+	return home.runFindAsync("Columns", "Find column...", home.findColumnItems)
 }
 
 func (home *Home) FindFunction() error {
-	items, err := home.findFunctionItems()
-	if err != nil {
-		return err
-	}
-	return home.showFindPicker("Functions", "Find function...", items)
+	return home.runFindAsync("Functions", "Find function...", home.findFunctionItems)
 }
 
 func (home *Home) FindView() error {
-	items, err := home.findViewItems()
-	if err != nil {
-		return err
-	}
-	return home.showFindPicker("Views", "Find view...", items)
+	return home.runFindAsync("Views", "Find view...", home.findViewItems)
 }
 
 func (home *Home) FindSchema() error {
-	items, err := home.findSchemaItems()
-	if err != nil {
-		return err
-	}
-	return home.showFindPicker("Schemas", "Find schema...", items)
+	return home.runFindAsync("Schemas", "Find schema...", home.findSchemaItems)
 }
 
 func (home *Home) FindInQueries() error {
-	items, err := home.findQueryItems()
-	if err != nil {
-		return err
-	}
-	return home.showFindPicker("Queries", "Find in queries...", items)
+	return home.runFindAsync("Queries", "Find in queries...", home.findQueryItems)
 }
 
 func (home *Home) FindRecent() error {
-	items, err := home.findRecentItems()
-	if err != nil {
-		return err
-	}
-	return home.showFindPicker("Recent", "Find recent...", items)
+	return home.runFindAsync("Recent", "Find recent...", home.findRecentItems)
 }
 
 func (home *Home) findTableItems() ([]FindPickerItem, error) {
@@ -158,7 +130,7 @@ func (home *Home) findTableItems() ([]FindPickerItem, error) {
 		return nil, err
 	}
 	if len(objects) == 0 {
-		return nil, errors.New("no tables found")
+		return nil, nil
 	}
 
 	items := make([]FindPickerItem, 0, len(objects))
@@ -191,7 +163,7 @@ func (home *Home) findColumnItems() ([]FindPickerItem, error) {
 		return nil, err
 	}
 	if len(objects) == 0 {
-		return nil, errors.New("no tables found")
+		return nil, nil
 	}
 
 	items := make([]FindPickerItem, 0, len(objects))
@@ -224,7 +196,7 @@ func (home *Home) findColumnItems() ([]FindPickerItem, error) {
 		}
 	}
 	if len(items) == 0 {
-		return nil, errors.New("no columns found")
+		return nil, nil
 	}
 	return items, nil
 }
@@ -241,7 +213,7 @@ func (home *Home) findFunctionItems() ([]FindPickerItem, error) {
 		return nil, err
 	}
 	if len(objects) == 0 {
-		return nil, errors.New("no functions found")
+		return nil, nil
 	}
 	return home.buildObjectItems(objects, includeDatabase, findKindFunction, func(obj findObject) error {
 		return home.describeFunctionByName(obj.database, obj.qualifiedName())
@@ -260,7 +232,7 @@ func (home *Home) findViewItems() ([]FindPickerItem, error) {
 		return nil, err
 	}
 	if len(objects) == 0 {
-		return nil, errors.New("no views found")
+		return nil, nil
 	}
 	return home.buildObjectItems(objects, includeDatabase, findKindView, func(obj findObject) error {
 		return home.describeViewByName(obj.database, obj.qualifiedName())
@@ -273,7 +245,7 @@ func (home *Home) findSchemaItems() ([]FindPickerItem, error) {
 		return nil, err
 	}
 	if len(schemas) == 0 {
-		return nil, errors.New("no schemas found")
+		return nil, nil
 	}
 	items := make([]FindPickerItem, 0, len(schemas))
 	for _, schema := range schemas {
@@ -309,7 +281,7 @@ func (home *Home) findQueryItems() ([]FindPickerItem, error) {
 		items = append(items, home.buildQueryItems(buf)...)
 	}
 	if len(items) == 0 {
-		return nil, errors.New("no query content found")
+		return nil, nil
 	}
 	return items, nil
 }
@@ -321,7 +293,7 @@ func (home *Home) findRecentItems() ([]FindPickerItem, error) {
 	}
 	items := history.list()
 	if len(items) == 0 {
-		return nil, errors.New("no recent items")
+		return nil, nil
 	}
 
 	includeDatabase := hasMultipleDatabases(items)
@@ -421,15 +393,31 @@ func (home *Home) focusEditor() {
 	App.SetFocus(results.Editor)
 }
 
-func (home *Home) showFindPicker(title string, placeholder string, items []FindPickerItem) error {
+func (home *Home) runFindAsync(title string, placeholder string, fetch func() ([]FindPickerItem, error)) error {
 	if home == nil || home.FindPicker == nil {
 		return errors.New("find picker not configured")
 	}
-	return home.FindPicker.Show(FindPickerConfig{
+	if err := home.FindPicker.ShowLoading(FindPickerConfig{
 		Title:       title,
 		Placeholder: placeholder,
-		Items:       items,
-	})
+	}); err != nil {
+		return err
+	}
+
+	done := App.Register()
+	go func() {
+		defer done()
+		items, err := fetch()
+		App.QueueUpdateDraw(func() {
+			if home.FindPicker != nil {
+				home.FindPicker.SetItems(items)
+			}
+			if err != nil {
+				home.showStatusError(err.Error())
+			}
+		})
+	}()
+	return nil
 }
 
 func (home *Home) collectObjects(fetch func(string) (map[string][]string, error)) ([]findObject, bool, error) {

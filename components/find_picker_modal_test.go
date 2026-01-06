@@ -1,6 +1,10 @@
 package components
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/rivo/tview"
+)
 
 func TestFilterFindItemsEmptyQuery(t *testing.T) {
 	items := []FindPickerItem{
@@ -53,5 +57,62 @@ func TestFilterFindItemsMatchesSecondary(t *testing.T) {
 	}
 	if filtered[0].Label != "orders" {
 		t.Fatalf("expected orders, got %q", filtered[0].Label)
+	}
+}
+
+func TestFindPickerShowAllowsEmptyItems(t *testing.T) {
+	mainPages = tview.NewPages()
+	picker := NewFindPicker()
+
+	if err := picker.Show(FindPickerConfig{Title: "Find", Placeholder: "Find...", Items: nil}); err != nil {
+		t.Fatalf("expected show to succeed, got %v", err)
+	}
+	if count := picker.list.GetItemCount(); count != 1 {
+		t.Fatalf("expected 1 list item, got %d", count)
+	}
+	main, _ := picker.list.GetItemText(0)
+	if main != "No matches" {
+		t.Fatalf("expected No matches, got %q", main)
+	}
+}
+
+func TestFindPickerShowLoadingThenSetItems(t *testing.T) {
+	mainPages = tview.NewPages()
+	picker := NewFindPicker()
+
+	if err := picker.ShowLoading(FindPickerConfig{Title: "Find", Placeholder: "Find..."}); err != nil {
+		t.Fatalf("expected show loading to succeed, got %v", err)
+	}
+	main, _ := picker.list.GetItemText(0)
+	if main != "Loading..." {
+		t.Fatalf("expected Loading..., got %q", main)
+	}
+
+	picker.SetItems([]FindPickerItem{{Label: "users"}})
+	if count := picker.list.GetItemCount(); count != 1 {
+		t.Fatalf("expected 1 list item, got %d", count)
+	}
+	main, _ = picker.list.GetItemText(0)
+	if main != "users" {
+		t.Fatalf("expected users, got %q", main)
+	}
+}
+
+func TestFindPickerSelectCurrentTriggersOnSelect(t *testing.T) {
+	mainPages = tview.NewPages()
+	picker := NewFindPicker()
+
+	called := 0
+	items := []FindPickerItem{
+		{Label: "users", OnSelect: func() { called++ }},
+	}
+
+	if err := picker.Show(FindPickerConfig{Title: "Find", Placeholder: "Find...", Items: items}); err != nil {
+		t.Fatalf("expected show to succeed, got %v", err)
+	}
+
+	picker.selectCurrent()
+	if called != 1 {
+		t.Fatalf("expected on select to be called once, got %d", called)
 	}
 }

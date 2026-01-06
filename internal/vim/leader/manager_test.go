@@ -1,0 +1,86 @@
+package leader_test
+
+import (
+	"errors"
+	"testing"
+	"time"
+
+	"github.com/gdamore/tcell/v2"
+
+	"github.com/lancekrogers/lazysql/internal/vim/leader"
+	"github.com/lancekrogers/lazysql/internal/vim/namespace"
+)
+
+type fakeFindController struct {
+	tableCalls int
+	tableErr   error
+}
+
+func (f *fakeFindController) FindTable() error {
+	f.tableCalls++
+	return f.tableErr
+}
+
+func (f *fakeFindController) FindColumn() error   { return nil }
+func (f *fakeFindController) FindFunction() error { return nil }
+func (f *fakeFindController) FindView() error     { return nil }
+func (f *fakeFindController) FindSchema() error   { return nil }
+func (f *fakeFindController) FindInQueries() error {
+	return nil
+}
+func (f *fakeFindController) FindRecent() error { return nil }
+
+type fakeStatusReporter struct {
+	errors []string
+}
+
+func (f *fakeStatusReporter) Info(string) {}
+
+func (f *fakeStatusReporter) Error(message string) {
+	f.errors = append(f.errors, message)
+}
+
+func sendRunes(manager *leader.Manager, runes ...rune) {
+	for _, r := range runes {
+		manager.HandleEvent(tcell.NewEventKey(tcell.KeyRune, r, 0))
+	}
+}
+
+func TestManagerExecutesFindCommand(t *testing.T) {
+	registry := leader.NewRegistry()
+	controller := &fakeFindController{}
+	findNS := namespace.NewFindNamespace(controller)
+	if _, err := namespace.Initialize(registry, findNS); err != nil {
+		t.Fatalf("initialize namespace: %v", err)
+	}
+
+	status := &fakeStatusReporter{}
+	manager := leader.NewManager(registry, nil, time.Second, status)
+
+	sendRunes(manager, '\\', 'f', 't')
+
+	if controller.tableCalls != 1 {
+		t.Fatalf("expected table call, got %d", controller.tableCalls)
+	}
+	if len(status.errors) != 0 {
+		t.Fatalf("unexpected status errors: %+v", status.errors)
+	}
+}
+
+func TestManagerReportsFindErrors(t *testing.T) {
+	registry := leader.NewRegistry()
+	controller := &fakeFindController{tableErr: errors.New("boom")}
+	findNS := namespace.NewFindNamespace(controller)
+	if _, err := namespace.Initialize(registry, findNS); err != nil {
+		t.Fatalf("initialize namespace: %v", err)
+	}
+
+	status := &fakeStatusReporter{}
+	manager := leader.NewManager(registry, nil, time.Second, status)
+
+	sendRunes(manager, '\\', 'f', 't')
+
+	if len(status.errors) != 1 || status.errors[0] != "boom" {
+		t.Fatalf("expected status error boom, got %+v", status.errors)
+	}
+}
