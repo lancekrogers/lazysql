@@ -160,3 +160,21 @@ func TestManagerExecutesWorkspaceCommand(t *testing.T) {
 		t.Fatalf("unexpected status errors: %+v", status.errors)
 	}
 }
+
+func TestManagerReportsWorkspaceErrors(t *testing.T) {
+	registry := leader.NewRegistry()
+	controller := &fakeWorkspaceController{connectErr: errors.New("boom")}
+	workspaceNS := namespace.NewWorkspaceNamespace(controller)
+	if _, err := namespace.Initialize(registry, workspaceNS); err != nil {
+		t.Fatalf("initialize namespace: %v", err)
+	}
+
+	status := &fakeStatusReporter{}
+	manager := leader.NewManager(registry, nil, time.Second, status)
+
+	sendRunes(manager, '\\', 'w', 'c')
+
+	if len(status.errors) != 1 || status.errors[0] != "boom" {
+		t.Fatalf("expected status error boom, got %+v", status.errors)
+	}
+}
