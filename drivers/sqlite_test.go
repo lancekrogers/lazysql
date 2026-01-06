@@ -173,7 +173,9 @@ func TestSQLite_Connect_Mock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error creating mock: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	sqlite := &SQLite{Connection: db}
 	mock.ExpectPing()
@@ -213,7 +215,9 @@ func TestSQLite_ErrorScenarios(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Error creating mock: %v", err)
 			}
-			defer db.Close()
+			defer func() {
+				_ = db.Close()
+			}()
 
 			tc.setupMock(mock)
 			sqlite := &SQLite{Connection: db}
@@ -235,7 +239,9 @@ func TestSQLite_GetTableColumns_Error(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error creating mock: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	sqlite := &SQLite{Connection: db}
 	mock.ExpectQuery(fmt.Sprintf("PRAGMA table_info\\(%s\\)", sqlite.formatTableName(testDBTableNameSQLite))).
@@ -257,7 +263,9 @@ func TestSQLite_GetRecords(t *testing.T) {
 		t.Fatalf("Error creating mock: %v", err)
 	}
 
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	sqlite := &SQLite{Connection: db}
 
@@ -302,7 +310,9 @@ func TestSQLite_GetForeignKeys(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error creating mock: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	sqlite := &SQLite{Connection: db}
 
@@ -336,7 +346,9 @@ func TestSQLite_GetIndexes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error creating mock: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	sqlite := &SQLite{Connection: db}
 
@@ -374,7 +386,9 @@ func TestSQLite_Transactions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error creating mock: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	mock.ExpectBegin()
 	mock.ExpectRollback()
@@ -409,7 +423,9 @@ func TestSQLite_ExecutePendingChanges(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error creating mock: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	sqlite := &SQLite{Connection: db}
 
@@ -448,7 +464,9 @@ func TestSQLite_GetPrimaryKeyColumnNames(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error creating mock: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	sqlite := &SQLite{Connection: db}
 

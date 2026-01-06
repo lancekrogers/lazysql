@@ -94,7 +94,9 @@ func (p *ShellPane) AppendOutput(message string) {
 	if p.output == nil {
 		return
 	}
-	fmt.Fprintln(p.output, message)
+	if _, err := fmt.Fprintln(p.output, message); err != nil {
+		return
+	}
 }
 
 func (p *ShellPane) ClearOutput() {

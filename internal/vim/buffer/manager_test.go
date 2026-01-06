@@ -44,7 +44,9 @@ func TestBufferUpdateContent(t *testing.T) {
 func TestBufferMarkSaved(t *testing.T) {
 	manager := NewManager()
 	buffer := manager.Create("test")
-	manager.UpdateContent(buffer.ID, "select 1")
+	if err := manager.UpdateContent(buffer.ID, "select 1"); err != nil {
+		t.Fatalf("update content: %v", err)
+	}
 
 	if err := manager.MarkSaved(buffer.ID); err != nil {
 		t.Fatalf("mark saved: %v", err)
@@ -170,7 +172,9 @@ func TestBufferDirtyList(t *testing.T) {
 	first := manager.Create("one")
 	second := manager.Create("two")
 
-	manager.UpdateContent(second.ID, "select 2")
+	if err := manager.UpdateContent(second.ID, "select 2"); err != nil {
+		t.Fatalf("update content: %v", err)
+	}
 	dirty := manager.GetDirtyBuffers()
 	if len(dirty) != 1 {
 		t.Fatalf("expected 1 dirty buffer, got %d", len(dirty))
@@ -191,9 +195,15 @@ func TestBufferListeners(t *testing.T) {
 	})
 
 	buffer := manager.Create("one")
-	manager.UpdateContent(buffer.ID, "select 1")
-	manager.MarkSaved(buffer.ID)
-	manager.Close(buffer.ID)
+	if err := manager.UpdateContent(buffer.ID, "select 1"); err != nil {
+		t.Fatalf("update content: %v", err)
+	}
+	if err := manager.MarkSaved(buffer.ID); err != nil {
+		t.Fatalf("mark saved: %v", err)
+	}
+	if err := manager.Close(buffer.ID); err != nil {
+		t.Fatalf("close buffer: %v", err)
+	}
 
 	if len(events) < 4 {
 		t.Fatalf("expected at least 4 events, got %d", len(events))

@@ -35,7 +35,7 @@ func (e *CommandExecutor) Execute(ctx context.Context, command string) error {
 
 	cmd := e.registry.Lookup(invocation.Name)
 	if cmd == nil {
-		return errors.New(fmt.Sprintf("not an editor command: %s", invocation.Raw))
+		return fmt.Errorf("not an editor command: %s", invocation.Raw)
 	}
 	return cmd.Execute(ctx, invocation, e.context)
 }

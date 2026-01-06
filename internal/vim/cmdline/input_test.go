@@ -25,6 +25,10 @@ type errorExecutor struct {
 	lastCtx context.Context
 }
 
+type ctxKey string
+
+const commandLineCtxKey ctxKey = "ctx-key"
+
 func (e *errorExecutor) Execute(ctx context.Context, _ string) error {
 	e.lastCtx = ctx
 	return e.err
@@ -113,7 +117,7 @@ func TestCommandLineCallbacksAndContext(t *testing.T) {
 		}
 	})
 
-	ctx := context.WithValue(context.Background(), "ctx-key", "ctx-value")
+	ctx := context.WithValue(context.Background(), commandLineCtxKey, "ctx-value")
 	commandLine.SetContext(ctx)
 	commandLine.Activate()
 	commandLine.SetText("w test.sql")
@@ -125,16 +129,16 @@ func TestCommandLineCallbacksAndContext(t *testing.T) {
 	if errorCount != 1 {
 		t.Fatalf("expected onError to fire once, got %d", errorCount)
 	}
-	if exec.lastCtx == nil || exec.lastCtx.Value("ctx-key") != "ctx-value" {
+	if exec.lastCtx == nil || exec.lastCtx.Value(commandLineCtxKey) != "ctx-value" {
 		t.Fatal("expected context to be passed to executor")
 	}
 
 	exec.err = nil
-	commandLine.SetContext(nil)
+	commandLine.SetContext(context.Background())
 	commandLine.Activate()
 	commandLine.SetText("w other.sql")
 	commandLine.handleDone(tcell.KeyEnter)
-	if exec.lastCtx == nil || exec.lastCtx.Value("ctx-key") != nil {
+	if exec.lastCtx == nil || exec.lastCtx.Value(commandLineCtxKey) != nil {
 		t.Fatal("expected context to reset to background")
 	}
 }

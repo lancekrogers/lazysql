@@ -43,6 +43,7 @@ func readFile(ctx context.Context, path string) ([]byte, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	// #nosec G304 -- paths are resolved and validated before read.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read file %s: %w", path, err)
@@ -63,7 +64,7 @@ func writeFile(ctx context.Context, path string, content []byte, allowOverwrite 
 	}
 
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return fmt.Errorf("create directory %s: %w", dir, err)
 	}
 
@@ -72,7 +73,9 @@ func writeFile(ctx context.Context, path string, content []byte, allowOverwrite 
 		return fmt.Errorf("create temp file: %w", err)
 	}
 	tmpPath := tmpFile.Name()
-	defer os.Remove(tmpPath)
+	defer func() {
+		_ = os.Remove(tmpPath)
+	}()
 
 	if _, err := tmpFile.Write(content); err != nil {
 		_ = tmpFile.Close()

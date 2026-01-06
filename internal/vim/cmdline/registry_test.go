@@ -61,7 +61,7 @@ func TestCommandExecutor(t *testing.T) {
 		t.Fatalf("expected empty command to be ignored, got %v", err)
 	}
 
-	if err := exec.Execute(nil, "e hello"); err != nil {
+	if err := exec.Execute(context.TODO(), "e hello"); err != nil {
 		t.Fatalf("execute command: %v", err)
 	}
 	if !cmd.called {

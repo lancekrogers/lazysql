@@ -64,7 +64,9 @@ func TestMSSQL_GetPrimaryKeyColumnNames(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error creating mock: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	pg := &MSSQL{Connection: db}
 
@@ -123,7 +125,9 @@ func TestMSSQL_GetForeignKeys(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error creating mock: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	pg := &MSSQL{Connection: db}
 
@@ -260,7 +264,9 @@ func TestMSSQL_GetIndexes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error creating mock: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	pg := &MSSQL{Connection: db}
 
@@ -357,7 +363,9 @@ func TestMSSQL_ExecutePendingChanges(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error creating mock: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	pg := &MSSQL{Connection: db}
 
@@ -396,7 +404,9 @@ func TestMSSQL_GetRecords(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error creating mock: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	pg := &MSSQL{Connection: db}
 

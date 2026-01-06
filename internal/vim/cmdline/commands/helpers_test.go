@@ -87,6 +87,7 @@ func TestWriteFile(t *testing.T) {
 	if err := writeFile(context.Background(), path, []byte("select 2;"), false); err != nil {
 		t.Fatalf("write file: %v", err)
 	}
+	// #nosec G304 -- test reads temp file content.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read file: %v", err)
@@ -110,6 +111,7 @@ func TestWriteFileOverwriteAndCancel(t *testing.T) {
 	if err := writeFile(context.Background(), path, []byte("new"), true); err != nil {
 		t.Fatalf("write file force: %v", err)
 	}
+	// #nosec G304 -- test reads temp file content.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read file: %v", err)
@@ -154,7 +156,7 @@ func TestWriteFileMkdirAllError(t *testing.T) {
 func TestWriteFileRenameError(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "target.sql")
-	if err := os.MkdirAll(target, 0o755); err != nil {
+	if err := os.MkdirAll(target, 0o750); err != nil {
 		t.Fatalf("mkdir target: %v", err)
 	}
 
@@ -169,10 +171,14 @@ func TestWriteFileCreateTempError(t *testing.T) {
 	}
 
 	dir := t.TempDir()
+	// #nosec G302 -- test relies on read-only directory permissions.
 	if err := os.Chmod(dir, 0o500); err != nil {
 		t.Skipf("chmod failed: %v", err)
 	}
-	defer os.Chmod(dir, 0o700)
+	defer func() {
+		// #nosec G302 -- restore directory permissions for cleanup.
+		_ = os.Chmod(dir, 0o700)
+	}()
 
 	path := filepath.Join(dir, "data.sql")
 	if err := writeFile(context.Background(), path, []byte("x"), true); err == nil {

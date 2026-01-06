@@ -54,7 +54,7 @@ func TestListenerNotifications(t *testing.T) {
 	}
 }
 
-func TestAddNilListener(t *testing.T) {
+func TestAddNilListener(_ *testing.T) {
 	manager := NewManager()
 	manager.AddListener(nil)
 	manager.EnterInsert()

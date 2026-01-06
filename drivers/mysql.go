@@ -44,7 +44,9 @@ func (db *MySQL) GetDatabases() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	for rows.Next() {
 		var database string
@@ -72,7 +74,9 @@ func (db *MySQL) GetTables(database string) (map[string][]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	tables := make(map[string][]string)
 	for rows.Next() {
@@ -107,7 +111,9 @@ func (db *MySQL) GetTableColumns(database, table string) (results [][]string, er
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	columns, err := rows.Columns()
 	if err != nil {
@@ -157,7 +163,9 @@ func (db *MySQL) GetConstraints(database, table string) (results [][]string, err
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	columns, err := rows.Columns()
 	if err != nil {
@@ -206,7 +214,9 @@ func (db *MySQL) GetForeignKeys(database, table string) (results [][]string, err
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	columns, err := rows.Columns()
 	if err != nil {
@@ -256,7 +266,9 @@ func (db *MySQL) GetIndexes(database, table string) (results [][]string, err err
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	columns, err := rows.Columns()
 	if err != nil {
@@ -320,7 +332,9 @@ func (db *MySQL) GetRecords(database, table, where, sort string, offset, limit i
 	if err != nil {
 		return nil, 0, queryString, err
 	}
-	defer paginatedRows.Close()
+	defer func() {
+		_ = paginatedRows.Close()
+	}()
 
 	columns, err := paginatedRows.Columns()
 	if err != nil {
@@ -389,7 +403,9 @@ func (db *MySQL) ExecuteQuery(query string) ([][]string, int, error) {
 	if err != nil {
 		return nil, 0, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	columns, err := rows.Columns()
 	if err != nil {
@@ -493,7 +509,9 @@ func (db *MySQL) GetPrimaryKeyColumnNames(database, table string) (primaryKeyCol
 		return nil, err
 	}
 
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	for rows.Next() {
 		var colName string

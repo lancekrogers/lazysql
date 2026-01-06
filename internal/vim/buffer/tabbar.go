@@ -33,7 +33,7 @@ func NewTabBar(manager *Manager) *TabBar {
 		onChange:    func() {},
 	}
 	if manager != nil {
-		manager.AddListener(func(event BufferEvent) {
+		manager.AddListener(func(_ BufferEvent) {
 			tabBar.updateTabs()
 			tabBar.onChange()
 		})
@@ -60,7 +60,7 @@ func (t *TabBar) SetMaxTabWidth(width int) {
 }
 
 func (t *TabBar) Draw(screen tcell.Screen) {
-	t.Box.DrawForSubclass(screen, t)
+	t.DrawForSubclass(screen, t)
 	x, y, width, _ := t.GetInnerRect()
 
 	t.updateTabs()
@@ -96,7 +96,7 @@ func (t *TabBar) Draw(screen tcell.Screen) {
 }
 
 func (t *TabBar) MouseHandler() func(action tview.MouseAction, event *tcell.EventMouse, setFocus func(p tview.Primitive)) (bool, tview.Primitive) {
-	return t.WrapMouseHandler(func(action tview.MouseAction, event *tcell.EventMouse, setFocus func(p tview.Primitive)) (bool, tview.Primitive) {
+	return t.WrapMouseHandler(func(action tview.MouseAction, event *tcell.EventMouse, _ func(p tview.Primitive)) (bool, tview.Primitive) {
 		if action != tview.MouseLeftClick {
 			return false, nil
 		}
@@ -151,15 +151,15 @@ func (t *TabBar) updateTabs() {
 	t.tabs = tabs
 }
 
-func truncate(label string, max int) string {
+func truncate(label string, maxWidth int) string {
 	runes := []rune(label)
-	if len(runes) <= max {
+	if len(runes) <= maxWidth {
 		return label
 	}
-	if max <= 3 {
-		return string(runes[:max])
+	if maxWidth <= 3 {
+		return string(runes[:maxWidth])
 	}
-	return string(runes[:max-3]) + "..."
+	return string(runes[:maxWidth-3]) + "..."
 }
 
 func drawLabel(screen tcell.Screen, label string, x, y, maxX int, style tcell.Style) int {

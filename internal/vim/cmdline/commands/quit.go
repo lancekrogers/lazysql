@@ -15,7 +15,7 @@ func (q *QuitCommand) Name() string {
 	return "q"
 }
 
-func (q *QuitCommand) Execute(ctx context.Context, inv cmdline.Invocation, env *cmdline.CommandContext) error {
+func (q *QuitCommand) Execute(_ context.Context, inv cmdline.Invocation, env *cmdline.CommandContext) error {
 	if env == nil || env.Buffers == nil {
 		return errors.New("buffer manager not configured")
 	}
@@ -77,7 +77,7 @@ func (qa *QuitAllCommand) Name() string {
 	return "qa"
 }
 
-func (qa *QuitAllCommand) Execute(ctx context.Context, inv cmdline.Invocation, env *cmdline.CommandContext) error {
+func (qa *QuitAllCommand) Execute(_ context.Context, inv cmdline.Invocation, env *cmdline.CommandContext) error {
 	if env == nil || env.Buffers == nil {
 		return errors.New("buffer manager not configured")
 	}
@@ -87,7 +87,7 @@ func (qa *QuitAllCommand) Execute(ctx context.Context, inv cmdline.Invocation, e
 
 	if !inv.Force {
 		if dirty := env.Buffers.GetDirtyBuffers(); len(dirty) > 0 {
-			return errors.New(fmt.Sprintf("%d file(s) have unsaved changes (add ! to override)", len(dirty)))
+			return fmt.Errorf("%d file(s) have unsaved changes (add ! to override)", len(dirty))
 		}
 	}
 

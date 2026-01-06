@@ -68,7 +68,9 @@ func (db *Postgres) GetDatabases() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	var databases []string
 	for rows.Next() {
@@ -109,7 +111,9 @@ func (db *Postgres) GetTables(database string) (map[string][]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	tables := make(map[string][]string)
 	for rows.Next() {
@@ -166,7 +170,9 @@ func (db *Postgres) GetTableColumns(database, table string) ([][]string, error) 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	columns, err := rows.Columns()
 	if err != nil {
@@ -248,7 +254,9 @@ func (db *Postgres) GetConstraints(database, table string) ([][]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	columns, err := rows.Columns()
 	if err != nil {
@@ -329,7 +337,9 @@ func (db *Postgres) GetForeignKeys(database, table string) ([][]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	columns, err := rows.Columns()
 	if err != nil {
@@ -419,7 +429,9 @@ func (db *Postgres) GetIndexes(database, table string) ([][]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	columns, err := rows.Columns()
 	if err != nil {
@@ -498,7 +510,13 @@ func (db *Postgres) GetRecords(database, table, where, sort string, offset, limi
 	if err != nil {
 		return nil, 0, queryString, err
 	}
-	defer paginatedRows.Close()
+	rowsClosed := false
+	defer func() {
+		if rowsClosed {
+			return
+		}
+		_ = paginatedRows.Close()
+	}()
 
 	columns, columnsError := paginatedRows.Columns()
 	if columnsError != nil {
@@ -541,6 +559,7 @@ func (db *Postgres) GetRecords(database, table, where, sort string, offset, limi
 	if err := paginatedRows.Close(); err != nil {
 		return nil, 0, queryString, err
 	}
+	rowsClosed = true
 
 	countQuery := "SELECT COUNT(*) FROM "
 	countQuery += formattedTableName
@@ -666,7 +685,9 @@ func (db *Postgres) ExecuteQuery(query string) ([][]string, int, error) {
 	if err != nil {
 		return nil, 0, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	columns, err := rows.Columns()
 	if err != nil {
@@ -772,7 +793,9 @@ func (db *Postgres) GetPrimaryKeyColumnNames(database, table string) ([]string, 
 		return nil, err
 	}
 
-	defer row.Close()
+	defer func() {
+		_ = row.Close()
+	}()
 
 	var primaryKeyColumnName []string
 	for row.Next() {

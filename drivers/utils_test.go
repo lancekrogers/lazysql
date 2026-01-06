@@ -110,7 +110,9 @@ func Test_queriesInTransaction(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer db.Close()
+			defer func() {
+				_ = db.Close()
+			}()
 			tt.setMockExpectations(mock)
 			queryErr := queriesInTransaction(db, tt.queries)
 			if tt.assertErr != nil {

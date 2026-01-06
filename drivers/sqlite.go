@@ -41,7 +41,9 @@ func (db *SQLite) GetDatabases() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	for rows.Next() {
 		var database string
@@ -71,7 +73,9 @@ func (db *SQLite) GetTables(database string) (map[string][]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	tables := make(map[string][]string)
 
@@ -100,7 +104,9 @@ func (db *SQLite) GetTableColumns(_, table string) (results [][]string, err erro
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	columns, err := rows.Columns()
 	if err != nil {
@@ -151,7 +157,9 @@ func (db *SQLite) GetConstraints(_, table string) (results [][]string, err error
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	columns, err := rows.Columns()
 	if err != nil {
@@ -200,7 +208,9 @@ func (db *SQLite) GetForeignKeys(_, table string) (results [][]string, err error
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	columns, err := rows.Columns()
 	if err != nil {
@@ -248,7 +258,9 @@ func (db *SQLite) GetIndexes(_, table string) (results [][]string, err error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	columns, err := rows.Columns()
 	if err != nil {
@@ -312,7 +324,13 @@ func (db *SQLite) GetRecords(_, table, where, sort string, offset, limit int) (p
 	if err != nil {
 		return nil, 0, queryString, err
 	}
-	defer paginatedRows.Close()
+	rowsClosed := false
+	defer func() {
+		if rowsClosed {
+			return
+		}
+		_ = paginatedRows.Close()
+	}()
 
 	columns, err := paginatedRows.Columns()
 	if err != nil {
@@ -357,6 +375,7 @@ func (db *SQLite) GetRecords(_, table, where, sort string, offset, limit int) (p
 	if err := paginatedRows.Close(); err != nil {
 		return nil, 0, queryString, err
 	}
+	rowsClosed = true
 
 	countQuery := "SELECT COUNT(*) FROM "
 	countQuery += db.formatTableName(table)
@@ -379,7 +398,9 @@ func (db *SQLite) ExecuteQuery(query string) ([][]string, int, error) {
 	if err != nil {
 		return nil, 0, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	columns, err := rows.Columns()
 	if err != nil {

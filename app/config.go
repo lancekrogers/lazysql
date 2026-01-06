@@ -54,6 +54,7 @@ func DefaultConfigFile() (string, error) {
 }
 
 func LoadConfig(configFile string) error {
+	// #nosec G304 -- config path is user-configured.
 	file, err := os.ReadFile(configFile)
 	if err != nil && !os.IsNotExist(err) {
 		return err
@@ -74,7 +75,7 @@ func LoadConfig(configFile string) error {
 func (c *Config) SaveConnections(connections []models.Connection) error {
 	c.Connections = connections
 
-	if err := os.MkdirAll(filepath.Dir(c.ConfigFile), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(c.ConfigFile), 0o750); err != nil {
 		return err
 	}
 
@@ -82,9 +83,14 @@ func (c *Config) SaveConnections(connections []models.Connection) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
-
-	return toml.NewEncoder(file).Encode(c)
+	if err := toml.NewEncoder(file).Encode(c); err != nil {
+		_ = file.Close()
+		return err
+	}
+	if err := file.Close(); err != nil {
+		return err
+	}
+	return nil
 }
 
 // parseConfigURL automatically generates the URL from the connection struct

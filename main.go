@@ -23,13 +23,35 @@ func main() {
 	}
 	flag.Usage = func() {
 		f := flag.CommandLine.Output()
-		fmt.Fprintln(f, "lazysql")
-		fmt.Fprintln(f, "")
-		fmt.Fprintf(f, "Usage:  %s [options] [connection_url]\n\n", os.Args[0])
-		fmt.Fprintln(f, "  connection_url")
-		fmt.Fprintln(f, "        database URL to connect to. Omit to start in picker mode")
-		fmt.Fprintln(f, "")
-		fmt.Fprintln(f, "Options:")
+		writeLine := func(line string) bool {
+			_, err := fmt.Fprintln(f, line)
+			return err == nil
+		}
+		writef := func(format string, args ...any) bool {
+			_, err := fmt.Fprintf(f, format, args...)
+			return err == nil
+		}
+		if !writeLine("lazysql") {
+			return
+		}
+		if !writeLine("") {
+			return
+		}
+		if !writef("Usage:  %s [options] [connection_url]\n\n", os.Args[0]) {
+			return
+		}
+		if !writeLine("  connection_url") {
+			return
+		}
+		if !writeLine("        database URL to connect to. Omit to start in picker mode") {
+			return
+		}
+		if !writeLine("") {
+			return
+		}
+		if !writeLine("Options:") {
+			return
+		}
 		flag.PrintDefaults()
 	}
 	configFile := flag.String("config", defaultConfigPath, "config file to use")

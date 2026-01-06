@@ -39,12 +39,15 @@ func mssqlGUIDToUUID(dbBytes []byte) (uuid.UUID, error) {
 	// expected by the standard UUID library.
 
 	// Swap bytes for the first 4-byte group (Data1)
+	// #nosec G602 -- length checked above.
 	b[0], b[1], b[2], b[3] = b[3], b[2], b[1], b[0]
 
 	// Swap bytes for the next 2-byte group (Data2)
+	// #nosec G602 -- length checked above.
 	b[4], b[5] = b[5], b[4]
 
 	// Swap bytes for the final 2-byte group of the first half (Data3)
+	// #nosec G602 -- length checked above.
 	b[6], b[7] = b[7], b[6]
 
 	// The last 8 bytes (Data4) are already in the correct big-endian order.
@@ -91,7 +94,9 @@ func (db *MSSQL) GetDatabases() ([]string, error) {
 		return nil, err
 	}
 
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	for rows.Next() {
 		var database string
@@ -125,7 +130,9 @@ func (db *MSSQL) GetTables(database string) (map[string][]string, error) {
 		return nil, err
 	}
 
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	for rows.Next() {
 		var table string
@@ -300,7 +307,9 @@ func (db *MSSQL) GetRecords(database, table, where, sort string, offset, limit i
 		return nil, 0, displayQueryString, err // Return display query even on error
 	}
 
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	columns, err := rows.Columns()
 	if err != nil {
@@ -493,7 +502,9 @@ func (db *MSSQL) ExecuteQuery(query string) ([][]string, int, error) {
 		return nil, 0, err
 	}
 
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	columns, err := rows.Columns()
 	if err != nil {
@@ -601,7 +612,9 @@ func (db *MSSQL) GetPrimaryKeyColumnNames(database, table string) ([]string, err
 		return nil, err
 	}
 
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	for rows.Next() {
 		var colName string
@@ -669,7 +682,9 @@ func (db *MSSQL) getTableInformation(query, database, table, schema string) ([][
 		return nil, err
 	}
 
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	columns, err := rows.Columns()
 	if err != nil {
@@ -830,7 +845,9 @@ func (db *MSSQL) GetFunctions(database string) (map[string][]string, error) {
 		return nil, err
 	}
 
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	for rows.Next() {
 		var function string
@@ -870,7 +887,9 @@ func (db *MSSQL) GetProcedures(database string) (map[string][]string, error) {
 		return nil, err
 	}
 
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	for rows.Next() {
 		var procedure string
@@ -918,7 +937,9 @@ func (db *MSSQL) GetViews(database string) (map[string][]string, error) {
 		return nil, err
 	}
 
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	for rows.Next() {
 		var view string

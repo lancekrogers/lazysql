@@ -85,6 +85,7 @@ func ReadSavedQueries(connectionIdentifier string) ([]models.SavedQuery, error) 
 		return []models.SavedQuery{}, nil
 	}
 
+	// #nosec G304 -- saved query path is derived from sanitized config input.
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read saved queries file %s: %w", filePath, err)
@@ -151,14 +152,20 @@ func writeSavedQueries(connectionIdentifier string, queries []models.SavedQuery)
 		return err
 	}
 
+	// #nosec G304 -- saved query path is derived from sanitized config input.
 	file, err := os.Create(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to create saved queries file %s: %w", filePath, err)
 	}
-	defer file.Close()
-
 	encoder := toml.NewEncoder(file)
-	return encoder.Encode(struct {
+	if err := encoder.Encode(struct {
 		Queries []models.SavedQuery `toml:"queries"`
-	}{Queries: queries})
+	}{Queries: queries}); err != nil {
+		_ = file.Close()
+		return err
+	}
+	if err := file.Close(); err != nil {
+		return err
+	}
+	return nil
 }

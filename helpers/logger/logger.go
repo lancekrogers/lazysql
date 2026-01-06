@@ -78,7 +78,8 @@ func (l *logger) SetFile(filename string) error {
 		}
 	}
 
-	file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	// #nosec G304 -- log file path is user-configured.
+	file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 	if err != nil {
 		return err
 	}

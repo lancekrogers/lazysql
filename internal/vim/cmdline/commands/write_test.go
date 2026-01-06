@@ -33,6 +33,7 @@ func TestWriteCommandWritesFile(t *testing.T) {
 		t.Fatalf("write command: %v", err)
 	}
 
+	// #nosec G304 -- test reads temp file content.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read file: %v", err)
@@ -93,6 +94,7 @@ func TestWriteCommandForceOverwrite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("write command: %v", err)
 	}
+	// #nosec G304 -- test reads temp file content.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read file: %v", err)

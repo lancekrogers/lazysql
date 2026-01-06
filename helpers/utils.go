@@ -36,7 +36,9 @@ func GetFreePort() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer l.Close()
+	defer func() {
+		_ = l.Close()
+	}()
 
 	return strconv.Itoa(l.Addr().(*net.TCPAddr).Port), nil
 }

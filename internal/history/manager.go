@@ -85,6 +85,7 @@ func ReadHistory(filePath string, _ int) ([]models.QueryHistoryItem, error) {
 		return []models.QueryHistoryItem{}, nil // No history file yet, return empty.
 	}
 
+	// #nosec G304 -- history path is derived from sanitized config input.
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read history file %s: %w", filePath, err)

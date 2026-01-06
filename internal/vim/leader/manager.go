@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/gdamore/tcell/v2"
+
 	"github.com/lancekrogers/lazysql/internal/vim/whichkey"
 )
 

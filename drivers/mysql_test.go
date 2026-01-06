@@ -614,7 +614,9 @@ func TestMySQL_Connect_Mock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	mysql := &MySQL{Connection: db}
 
@@ -674,7 +676,9 @@ func TestMySQL_ErrorScenarios(t *testing.T) {
 			if err != nil {
 				t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 			}
-			defer db.Close()
+			defer func() {
+				_ = db.Close()
+			}()
 
 			tc.setupMock(mock)
 
@@ -697,7 +701,9 @@ func TestMySQL_GetTableColumns_Error(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	mysql := &MySQL{Connection: db}
 
@@ -720,7 +726,9 @@ func TestMySQL_GetConstraints_Error(t *testing.T) {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	mysql := &MySQL{Connection: db}
 
@@ -744,7 +752,9 @@ func TestMySQL_GetForeignKeys_Error(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	mysql := &MySQL{Connection: db}
 
@@ -766,7 +776,9 @@ func TestMySQL_GetIndexes_Error(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	mysql := &MySQL{Connection: db}
 
@@ -788,7 +800,9 @@ func TestMySQL_GetRecords_Error(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	mysql := &MySQL{Connection: db}
 
@@ -838,7 +852,9 @@ func TestMySQL_ExecuteQuery_Error(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	mysql := &MySQL{Connection: db}
 
@@ -860,7 +876,9 @@ func TestMySQL_UpdateRecord_Error(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	mysql := &MySQL{Connection: db}
 
@@ -884,7 +902,9 @@ func TestMySQL_DeleteRecord_Error(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	mysql := &MySQL{Connection: db}
 
@@ -906,7 +926,9 @@ func TestMySQL_ExecuteDMLStatement_Error(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	mysql := &MySQL{Connection: db}
 
@@ -928,7 +950,9 @@ func TestMySQL_ExecutePendingChanges_PartialFailure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	mysql := &MySQL{Connection: db}
 
@@ -992,7 +1016,9 @@ func TestMySQL_ExecutePendingChanges_Error(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	mysql := &MySQL{Connection: db}
 
@@ -1037,7 +1063,9 @@ func TestMySQL_GetPrimaryKeyColumnNames_Error(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	mysql := &MySQL{Connection: db}
 
@@ -1061,7 +1089,9 @@ func TestMySQL_TestConnection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error creating mock database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	mysql := &MySQL{Connection: db}
 
@@ -1082,7 +1112,9 @@ func TestMySQL_Transactions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	mock.ExpectBegin()
 	mock.ExpectRollback()
@@ -1163,7 +1195,9 @@ func TestMySQL_GetDatabases(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	mysql := &MySQL{Connection: db}
 
@@ -1192,7 +1226,9 @@ func TestMySQL_GetTables(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error creating mock: %s", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	mysql := &MySQL{Connection: db}
 
@@ -1226,7 +1262,9 @@ func TestMySQL_GetTableColumns(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error creating mock: %s", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	mysql := &MySQL{Connection: db}
 
@@ -1262,7 +1300,9 @@ func TestMySQL_GetConstraints(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error creating mock: %s", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	mysql := &MySQL{Connection: db}
 
@@ -1298,7 +1338,9 @@ func TestMySQL_GetForeignKeys(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error creating mock: %s", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	mysql := &MySQL{Connection: db}
 
@@ -1342,7 +1384,9 @@ func TestMySQL_GetIndexes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error creating mock: %s", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	mysql := &MySQL{Connection: db}
 
@@ -1380,7 +1424,9 @@ func TestMySQL_GetRecords(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error creating mock: %s", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	mysql := &MySQL{Connection: db}
 
@@ -1426,7 +1472,9 @@ func TestMySQL_ExecuteQuery(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error creating mock: %s", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	mysql := &MySQL{Connection: db}
 
@@ -1464,7 +1512,9 @@ func TestMySQL_UpdateRecord(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error creating mock: %s", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	mysql := &MySQL{Connection: db}
 
@@ -1487,7 +1537,9 @@ func TestMySQL_DeleteRecord(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error creating mock: %s", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	mysql := &MySQL{Connection: db}
 
@@ -1510,7 +1562,9 @@ func TestMySQL_ExecuteDMLStatement(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error creating mock: %s", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	mysql := &MySQL{Connection: db}
 
@@ -1538,7 +1592,9 @@ func TestMySQL_ExecutePendingChanges(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error creating mock: %s", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	mysql := &MySQL{Connection: db}
 
@@ -1590,7 +1646,9 @@ func TestMySQL_GetPrimaryKeyColumnNames(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error creating mock: %s", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	mysql := &MySQL{Connection: db}
 

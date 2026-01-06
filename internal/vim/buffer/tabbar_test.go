@@ -11,7 +11,9 @@ func TestTabBarUpdates(t *testing.T) {
 	manager := NewManager()
 	first := manager.Create("one")
 	second := manager.Create("two")
-	manager.UpdateContent(second.ID, "select 2")
+	if err := manager.UpdateContent(second.ID, "select 2"); err != nil {
+		t.Fatalf("update content: %v", err)
+	}
 
 	tabBar := NewTabBar(manager)
 	tabBar.updateTabs()
@@ -53,7 +55,9 @@ func TestTabBarMouseClick(t *testing.T) {
 func TestTabBarDrawAndTruncate(t *testing.T) {
 	manager := NewManager()
 	buffer := manager.Create("very-long-buffer-name")
-	manager.UpdateContent(buffer.ID, "select 1")
+	if err := manager.UpdateContent(buffer.ID, "select 1"); err != nil {
+		t.Fatalf("update content: %v", err)
+	}
 
 	tabBar := NewTabBar(manager)
 	tabBar.SetMaxTabWidth(5)

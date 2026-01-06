@@ -178,7 +178,9 @@ func TestPostgres_Connect_Mock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error creating mock: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	pg := &Postgres{Connection: db}
 	mock.ExpectPing()
@@ -218,7 +220,9 @@ func TestPostgres_ErrorScenarios(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Error creating mock: %v", err)
 			}
-			defer db.Close()
+			defer func() {
+				_ = db.Close()
+			}()
 
 			tc.setupMock(mock)
 			pg := &Postgres{Connection: db, CurrentDatabase: schemaPostgres}
@@ -240,7 +244,9 @@ func TestPostgres_GetTableColumns_Error(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error creating mock: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	pg := &Postgres{Connection: db, CurrentDatabase: DBNamePostgres}
 	mock.ExpectQuery("SELECT column_name, data_type, is_nullable, column_default FROM information_schema.columns WHERE table_catalog = \\$1 AND table_schema = \\$2 AND table_name = \\$3 ORDER by ordinal_position").WithArgs(DBNamePostgres, schemaPostgres, tableNamePostgres).
@@ -261,7 +267,9 @@ func TestPostgres_GetRecords(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error creating mock: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	pg := &Postgres{Connection: db, CurrentDatabase: DBNamePostgres}
 
@@ -303,7 +311,9 @@ func TestPostgres_GetForeignKeys(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error creating mock: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	pg := &Postgres{Connection: db, CurrentDatabase: DBNamePostgres}
 
@@ -359,7 +369,9 @@ func TestPostgres_GetIndexes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error creating mock: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	pg := &Postgres{Connection: db, CurrentDatabase: DBNamePostgres}
 
@@ -417,7 +429,9 @@ func TestPostgres_Transactions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error creating mock: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	mock.ExpectBegin()
 	mock.ExpectRollback()
@@ -452,7 +466,9 @@ func TestPostgres_ExecutePendingChanges(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error creating mock: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	pg := &Postgres{Connection: db, CurrentDatabase: DBNamePostgres}
 
@@ -489,7 +505,9 @@ func TestPostgres_GetPrimaryKeyColumnNames(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error creating mock: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	pg := &Postgres{Connection: db, CurrentDatabase: DBNamePostgres}
 

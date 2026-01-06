@@ -123,7 +123,7 @@ func (w *WhichKeyOverlay) SetReturnFocus(primitive tview.Primitive) {
 }
 
 func (w *WhichKeyOverlay) InputHandler() func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
-	return w.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
+	return w.WrapInputHandler(func(event *tcell.EventKey, _ func(p tview.Primitive)) {
 		if !w.visible || w.tree == nil {
 			return
 		}
@@ -159,11 +159,11 @@ func (w *WhichKeyOverlay) Draw(screen tcell.Screen) {
 	overlayX, overlayY := w.positionRect(container, overlayWidth, overlayHeight)
 
 	w.Box.SetRect(overlayX, overlayY, overlayWidth, overlayHeight)
-	w.Box.SetBorderColor(w.styles.BorderColor)
-	w.Box.SetTitleColor(w.styles.TitleColor)
+	w.SetBorderColor(w.styles.BorderColor)
+	w.SetTitleColor(w.styles.TitleColor)
 	w.Box.SetTitle(w.title)
-	w.Box.SetBackgroundColor(w.styles.BackgroundColor)
-	w.Box.DrawForSubclass(screen, w)
+	w.SetBackgroundColor(w.styles.BackgroundColor)
+	w.DrawForSubclass(screen, w)
 
 	innerX, innerY, innerW, innerH := w.GetInnerRect()
 	w.drawContent(screen, innerX, innerY, innerW, innerH)
@@ -226,8 +226,8 @@ func (w *WhichKeyOverlay) calculateSize(maxWidth, maxHeight int) (int, int) {
 func (w *WhichKeyOverlay) positionRect(container rect, width, height int) (int, int) {
 	const margin = 1
 
-	x := container.x
-	y := container.y
+	var x int
+	var y int
 
 	switch w.position {
 	case PositionBottomRight:
