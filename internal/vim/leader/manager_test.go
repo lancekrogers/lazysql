@@ -30,6 +30,26 @@ func (f *fakeFindController) FindInQueries() error {
 }
 func (f *fakeFindController) FindRecent() error { return nil }
 
+type fakeTreeController struct {
+	toggleCalls int
+	toggleErr   error
+}
+
+func (f *fakeTreeController) ToggleTree() error {
+	f.toggleCalls++
+	return f.toggleErr
+}
+
+func (f *fakeTreeController) ExpandNode() error   { return nil }
+func (f *fakeTreeController) CollapseNode() error { return nil }
+func (f *fakeTreeController) ExpandAll() error    { return nil }
+func (f *fakeTreeController) CollapseAll() error  { return nil }
+func (f *fakeTreeController) FocusTree() error    { return nil }
+func (f *fakeTreeController) RefreshTree() error  { return nil }
+func (f *fakeTreeController) SyncWithBuffer() error {
+	return nil
+}
+
 type fakeStatusReporter struct {
 	errors []string
 }
@@ -82,5 +102,26 @@ func TestManagerReportsFindErrors(t *testing.T) {
 
 	if len(status.errors) != 1 || status.errors[0] != "boom" {
 		t.Fatalf("expected status error boom, got %+v", status.errors)
+	}
+}
+
+func TestManagerExecutesTreeCommand(t *testing.T) {
+	registry := leader.NewRegistry()
+	controller := &fakeTreeController{}
+	treeNS := namespace.NewTreeNamespace(controller)
+	if _, err := namespace.Initialize(registry, treeNS); err != nil {
+		t.Fatalf("initialize namespace: %v", err)
+	}
+
+	status := &fakeStatusReporter{}
+	manager := leader.NewManager(registry, nil, time.Second, status)
+
+	sendRunes(manager, '\\', 't', 't')
+
+	if controller.toggleCalls != 1 {
+		t.Fatalf("expected toggle call, got %d", controller.toggleCalls)
+	}
+	if len(status.errors) != 0 {
+		t.Fatalf("unexpected status errors: %+v", status.errors)
 	}
 }

@@ -61,6 +61,7 @@ type Home struct {
 	ListOfDBChanges      []models.DBDMLChange
 	ConnectionIdentifier string
 	ConnectionURL        string
+	ConnectionDBName     string
 	ReadOnly             bool
 }
 
@@ -122,6 +123,7 @@ func NewHomePage(connection models.Connection, dbdriver drivers.Driver) *Home {
 		ListOfDBChanges:      []models.DBDMLChange{},
 		ConnectionIdentifier: connectionIdentifier,
 		ConnectionURL:        connection.URL,
+		ConnectionDBName:     connection.DBName,
 		ReadOnly:             connection.ReadOnly,
 	}
 
@@ -139,6 +141,15 @@ func NewHomePage(connection models.Connection, dbdriver drivers.Driver) *Home {
 	})
 	home.ShellHistoryModal = shellHistoryModal
 
+	if err := leaderRegistry.Register(leader.Command{
+		Sequence:    []rune{'e'},
+		Description: "Toggle tree",
+		Handler:     home.ToggleTree,
+		Category:    "tree",
+	}); err != nil {
+		logger.Error("Failed to register leader command", map[string]any{"error": err})
+	}
+
 	leaderManager := leader.NewManager(leaderRegistry, leaderOverlay, leader.ConfigFromApp(app.App.Config()).Timeout, homeStatusReporter{home: home})
 	home.LeaderManager = leaderManager
 
@@ -147,7 +158,8 @@ func NewHomePage(connection models.Connection, dbdriver drivers.Driver) *Home {
 	runNamespace := namespace.NewRunNamespace(home)
 	describeNamespace := namespace.NewDescribeNamespace(home)
 	findNamespace := namespace.NewFindNamespace(home)
-	namespaceRegistry, err := namespace.Initialize(leaderRegistry, bufferNamespace, shellNamespace, runNamespace, describeNamespace, findNamespace)
+	treeNamespace := namespace.NewTreeNamespace(home)
+	namespaceRegistry, err := namespace.Initialize(leaderRegistry, bufferNamespace, shellNamespace, runNamespace, describeNamespace, findNamespace, treeNamespace)
 	if err != nil {
 		logger.Error("Failed to initialize namespaces", map[string]any{"error": err})
 	} else {
