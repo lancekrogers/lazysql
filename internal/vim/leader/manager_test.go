@@ -81,6 +81,23 @@ func (f *fakeExplainController) ExplainAnalyzeCurrentQuery() error {
 	return f.analyzeErr
 }
 
+type fakeCancelController struct {
+	cancelCalls int
+	cancelErr   error
+	clearCalls  int
+	clearErr    error
+}
+
+func (f *fakeCancelController) CancelQuery() error {
+	f.cancelCalls++
+	return f.cancelErr
+}
+
+func (f *fakeCancelController) ClearResults() error {
+	f.clearCalls++
+	return f.clearErr
+}
+
 type fakeStatusReporter struct {
 	errors []string
 }
@@ -229,6 +246,66 @@ func TestManagerReportsExplainErrors(t *testing.T) {
 	manager := leader.NewManager(registry, nil, time.Second, status)
 
 	sendRunes(manager, '\\', 'x', 'x')
+
+	if len(status.errors) != 1 || status.errors[0] != "boom" {
+		t.Fatalf("expected status error boom, got %+v", status.errors)
+	}
+}
+
+func TestManagerExecutesCancelCommand(t *testing.T) {
+	registry := leader.NewRegistry()
+	controller := &fakeCancelController{}
+	cancelNS := namespace.NewCancelNamespace(controller)
+	if _, err := namespace.Initialize(registry, cancelNS); err != nil {
+		t.Fatalf("initialize namespace: %v", err)
+	}
+
+	status := &fakeStatusReporter{}
+	manager := leader.NewManager(registry, nil, time.Second, status)
+
+	sendRunes(manager, '\\', 'c', 'c')
+
+	if controller.cancelCalls != 1 {
+		t.Fatalf("expected cancel call, got %d", controller.cancelCalls)
+	}
+	if len(status.errors) != 0 {
+		t.Fatalf("unexpected status errors: %+v", status.errors)
+	}
+}
+
+func TestManagerExecutesClearResultsCommand(t *testing.T) {
+	registry := leader.NewRegistry()
+	controller := &fakeCancelController{}
+	cancelNS := namespace.NewCancelNamespace(controller)
+	if _, err := namespace.Initialize(registry, cancelNS); err != nil {
+		t.Fatalf("initialize namespace: %v", err)
+	}
+
+	status := &fakeStatusReporter{}
+	manager := leader.NewManager(registry, nil, time.Second, status)
+
+	sendRunes(manager, '\\', 'c', 'l')
+
+	if controller.clearCalls != 1 {
+		t.Fatalf("expected clear call, got %d", controller.clearCalls)
+	}
+	if len(status.errors) != 0 {
+		t.Fatalf("unexpected status errors: %+v", status.errors)
+	}
+}
+
+func TestManagerReportsCancelErrors(t *testing.T) {
+	registry := leader.NewRegistry()
+	controller := &fakeCancelController{cancelErr: errors.New("boom")}
+	cancelNS := namespace.NewCancelNamespace(controller)
+	if _, err := namespace.Initialize(registry, cancelNS); err != nil {
+		t.Fatalf("initialize namespace: %v", err)
+	}
+
+	status := &fakeStatusReporter{}
+	manager := leader.NewManager(registry, nil, time.Second, status)
+
+	sendRunes(manager, '\\', 'c', 'c')
 
 	if len(status.errors) != 1 || status.errors[0] != "boom" {
 		t.Fatalf("expected status error boom, got %+v", status.errors)

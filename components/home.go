@@ -166,7 +166,8 @@ func NewHomePage(connection models.Connection, dbdriver drivers.Driver) *Home {
 	treeNamespace := namespace.NewTreeNamespace(home)
 	workspaceNamespace := namespace.NewWorkspaceNamespace(home)
 	explainNamespace := namespace.NewExplainNamespace(home)
-	namespaceRegistry, err := namespace.Initialize(leaderRegistry, bufferNamespace, shellNamespace, runNamespace, describeNamespace, findNamespace, treeNamespace, workspaceNamespace, explainNamespace)
+	cancelNamespace := namespace.NewCancelNamespace(home)
+	namespaceRegistry, err := namespace.Initialize(leaderRegistry, bufferNamespace, shellNamespace, runNamespace, describeNamespace, findNamespace, treeNamespace, workspaceNamespace, explainNamespace, cancelNamespace)
 	if err != nil {
 		logger.Error("Failed to initialize namespaces", map[string]any{"error": err})
 	} else {
