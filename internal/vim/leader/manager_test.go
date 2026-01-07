@@ -64,6 +64,23 @@ func (f *fakeWorkspaceController) SwitchConnection() error { return nil }
 func (f *fakeWorkspaceController) ListConnections() error  { return nil }
 func (f *fakeWorkspaceController) Disconnect() error       { return nil }
 
+type fakeExplainController struct {
+	explainCalls int
+	analyzeCalls int
+	explainErr   error
+	analyzeErr   error
+}
+
+func (f *fakeExplainController) ExplainCurrentQuery() error {
+	f.explainCalls++
+	return f.explainErr
+}
+
+func (f *fakeExplainController) ExplainAnalyzeCurrentQuery() error {
+	f.analyzeCalls++
+	return f.analyzeErr
+}
+
 type fakeStatusReporter struct {
 	errors []string
 }
@@ -173,6 +190,45 @@ func TestManagerReportsWorkspaceErrors(t *testing.T) {
 	manager := leader.NewManager(registry, nil, time.Second, status)
 
 	sendRunes(manager, '\\', 'w', 'c')
+
+	if len(status.errors) != 1 || status.errors[0] != "boom" {
+		t.Fatalf("expected status error boom, got %+v", status.errors)
+	}
+}
+
+func TestManagerExecutesExplainCommand(t *testing.T) {
+	registry := leader.NewRegistry()
+	controller := &fakeExplainController{}
+	explainNS := namespace.NewExplainNamespace(controller)
+	if _, err := namespace.Initialize(registry, explainNS); err != nil {
+		t.Fatalf("initialize namespace: %v", err)
+	}
+
+	status := &fakeStatusReporter{}
+	manager := leader.NewManager(registry, nil, time.Second, status)
+
+	sendRunes(manager, '\\', 'x', 'x')
+
+	if controller.explainCalls != 1 {
+		t.Fatalf("expected explain call, got %d", controller.explainCalls)
+	}
+	if len(status.errors) != 0 {
+		t.Fatalf("unexpected status errors: %+v", status.errors)
+	}
+}
+
+func TestManagerReportsExplainErrors(t *testing.T) {
+	registry := leader.NewRegistry()
+	controller := &fakeExplainController{explainErr: errors.New("boom")}
+	explainNS := namespace.NewExplainNamespace(controller)
+	if _, err := namespace.Initialize(registry, explainNS); err != nil {
+		t.Fatalf("initialize namespace: %v", err)
+	}
+
+	status := &fakeStatusReporter{}
+	manager := leader.NewManager(registry, nil, time.Second, status)
+
+	sendRunes(manager, '\\', 'x', 'x')
 
 	if len(status.errors) != 1 || status.errors[0] != "boom" {
 		t.Fatalf("expected status error boom, got %+v", status.errors)
