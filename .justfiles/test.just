@@ -5,10 +5,10 @@
 default:
     @just --list --unsorted --justfile {{source_file()}}
 
-# Run all tests
+# Run all tests (unit + integration; requires Docker)
 [no-cd]
 all:
-    go test ./...
+    go test -tags=integration ./...
 
 # Run unit tests with short mode
 [no-cd]
