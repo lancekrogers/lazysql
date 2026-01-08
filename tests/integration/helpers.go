@@ -114,9 +114,11 @@ func (tc *TestContainer) Reset() error {
 		return fmt.Errorf("ping database: %w", err)
 	}
 
-	_, err = db.ExecContext(ctx, "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;")
-	if err != nil {
-		return fmt.Errorf("reset schema: %w", err)
+	if _, err := db.ExecContext(ctx, "DROP SCHEMA IF EXISTS public CASCADE"); err != nil {
+		return fmt.Errorf("drop schema: %w", err)
+	}
+	if _, err := db.ExecContext(ctx, "CREATE SCHEMA public"); err != nil {
+		return fmt.Errorf("create schema: %w", err)
 	}
 
 	return nil
