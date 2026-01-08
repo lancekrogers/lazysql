@@ -34,3 +34,8 @@ coverage:
 [no-cd]
 coverage-html:
     go test -coverprofile=coverage.out ./... && go tool cover -html=coverage.out -o coverage.html
+
+# Run integration tests (requires Docker)
+[no-cd]
+integration:
+    go test -tags=integration ./tests/integration/...
