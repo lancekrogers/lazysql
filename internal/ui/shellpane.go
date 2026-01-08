@@ -2,9 +2,16 @@ package ui
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
+)
+
+const (
+	shellPaneDefaultHeightRatio = 0.3
+	shellPaneFallbackHeight     = 10
+	shellPaneMinHeight          = 3
 )
 
 type ShellPane struct {
@@ -25,7 +32,7 @@ func NewShellPane() *ShellPane {
 		output:     tview.NewTextView(),
 		history:    make([]string, 0, 100),
 		visible:    false,
-		height:     10,
+		height:     0,
 		historyIdx: 0,
 	}
 
@@ -64,6 +71,16 @@ func (p *ShellPane) SetHeight(height int) {
 		return
 	}
 	p.height = height
+}
+
+func (p *ShellPane) PreferredHeight(totalHeight int) int {
+	if p == nil {
+		return 0
+	}
+	if p.height > 0 {
+		return p.height
+	}
+	return defaultShellPaneHeight(totalHeight)
 }
 
 func (p *ShellPane) IsVisible() bool {
@@ -171,4 +188,15 @@ func (p *ShellPane) navigateHistory(delta int) {
 	} else {
 		p.input.SetText("")
 	}
+}
+
+func defaultShellPaneHeight(totalHeight int) int {
+	if totalHeight <= 0 {
+		return shellPaneFallbackHeight
+	}
+	height := int(math.Round(float64(totalHeight) * shellPaneDefaultHeightRatio))
+	if height < shellPaneMinHeight {
+		height = shellPaneMinHeight
+	}
+	return height
 }

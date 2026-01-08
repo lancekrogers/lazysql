@@ -98,6 +98,46 @@ func (f *fakeCancelController) ClearResults() error {
 	return f.clearErr
 }
 
+type fakeShellController struct {
+	toggleCalls  int
+	closeCalls   int
+	focusCalls   int
+	clearCalls   int
+	resizeCalls  int
+	historyCalls int
+	toggleErr    error
+}
+
+func (f *fakeShellController) ToggleShell() error {
+	f.toggleCalls++
+	return f.toggleErr
+}
+
+func (f *fakeShellController) CloseShell() error {
+	f.closeCalls++
+	return nil
+}
+
+func (f *fakeShellController) FocusShellInput() error {
+	f.focusCalls++
+	return nil
+}
+
+func (f *fakeShellController) ClearShellOutput() error {
+	f.clearCalls++
+	return nil
+}
+
+func (f *fakeShellController) ResizeShell() error {
+	f.resizeCalls++
+	return nil
+}
+
+func (f *fakeShellController) ShowShellHistory() error {
+	f.historyCalls++
+	return nil
+}
+
 type fakeStatusReporter struct {
 	errors []string
 }
@@ -306,6 +346,65 @@ func TestManagerReportsCancelErrors(t *testing.T) {
 	manager := leader.NewManager(registry, nil, time.Second, status)
 
 	sendRunes(manager, '\\', 'c', 'c')
+
+	if len(status.errors) != 1 || status.errors[0] != "boom" {
+		t.Fatalf("expected status error boom, got %+v", status.errors)
+	}
+}
+
+func TestManagerExecutesShellCommands(t *testing.T) {
+	registry := leader.NewRegistry()
+	controller := &fakeShellController{}
+	shellNS := namespace.NewShellNamespace(controller)
+	if _, err := namespace.Initialize(registry, shellNS); err != nil {
+		t.Fatalf("initialize namespace: %v", err)
+	}
+
+	status := &fakeStatusReporter{}
+	manager := leader.NewManager(registry, nil, time.Second, status)
+
+	sendRunes(manager, '\\', 's', 's')
+	sendRunes(manager, '\\', 's', 'f')
+	sendRunes(manager, '\\', 's', 'q')
+	sendRunes(manager, '\\', 's', 'c')
+	sendRunes(manager, '\\', 's', 'r')
+	sendRunes(manager, '\\', 's', 'h')
+
+	if controller.toggleCalls != 1 {
+		t.Fatalf("expected toggle call, got %d", controller.toggleCalls)
+	}
+	if controller.focusCalls != 1 {
+		t.Fatalf("expected focus call, got %d", controller.focusCalls)
+	}
+	if controller.closeCalls != 1 {
+		t.Fatalf("expected close call, got %d", controller.closeCalls)
+	}
+	if controller.clearCalls != 1 {
+		t.Fatalf("expected clear call, got %d", controller.clearCalls)
+	}
+	if controller.resizeCalls != 1 {
+		t.Fatalf("expected resize call, got %d", controller.resizeCalls)
+	}
+	if controller.historyCalls != 1 {
+		t.Fatalf("expected history call, got %d", controller.historyCalls)
+	}
+	if len(status.errors) != 0 {
+		t.Fatalf("unexpected status errors: %+v", status.errors)
+	}
+}
+
+func TestManagerReportsShellErrors(t *testing.T) {
+	registry := leader.NewRegistry()
+	controller := &fakeShellController{toggleErr: errors.New("boom")}
+	shellNS := namespace.NewShellNamespace(controller)
+	if _, err := namespace.Initialize(registry, shellNS); err != nil {
+		t.Fatalf("initialize namespace: %v", err)
+	}
+
+	status := &fakeStatusReporter{}
+	manager := leader.NewManager(registry, nil, time.Second, status)
+
+	sendRunes(manager, '\\', 's', 's')
 
 	if len(status.errors) != 1 || status.errors[0] != "boom" {
 		t.Fatalf("expected status error boom, got %+v", status.errors)

@@ -130,6 +130,8 @@ func NewHomePage(connection models.Connection, dbdriver drivers.Driver) *Home {
 		ReadOnly:             connection.ReadOnly,
 	}
 
+	tree.SetOnExit(home.focusRightWrapper)
+
 	connectionIndicator.SetConnection(connectionIdentifier)
 
 	shellPane.SetOnExecute(home.executeShellQuery)
@@ -802,7 +804,7 @@ func (home *Home) layoutMain() {
 		home.AddItem(home.ContentPages, 0, 1, false)
 	}
 	if home.ShellPane != nil && home.ShellPane.IsVisible() {
-		home.AddItem(home.ShellPane, home.ShellPane.Height(), 0, false)
+		home.AddItem(home.ShellPane, home.shellPaneHeight(), 0, false)
 	}
 	if home.StatusBar != nil {
 		home.AddItem(home.StatusBar, 1, 0, false)
@@ -814,6 +816,14 @@ func (home *Home) shellPane() (*ui.ShellPane, error) {
 		return nil, errors.New("shell pane not configured")
 	}
 	return home.ShellPane, nil
+}
+
+func (home *Home) shellPaneHeight() int {
+	if home == nil || home.ShellPane == nil {
+		return 0
+	}
+	_, _, _, height := home.GetRect()
+	return home.ShellPane.PreferredHeight(height)
 }
 
 func (home *Home) isShellFocused() bool {
@@ -900,7 +910,7 @@ func (home *Home) ResizeShell() error {
 		}
 	}
 	heights := []int{10, 15, 25}
-	current := pane.Height()
+	current := home.shellPaneHeight()
 	next := heights[0]
 	for i, height := range heights {
 		if height == current {

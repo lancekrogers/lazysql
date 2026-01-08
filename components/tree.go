@@ -8,13 +8,15 @@ import (
 	"strings"
 
 	"github.com/gdamore/tcell/v2"
-	"github.com/lithammer/fuzzysearch/fuzzy"
 	"github.com/rivo/tview"
 
 	"github.com/lancekrogers/lazysql/app"
 	"github.com/lancekrogers/lazysql/commands"
 	"github.com/lancekrogers/lazysql/drivers"
 	"github.com/lancekrogers/lazysql/helpers/logger"
+	"github.com/lancekrogers/lazysql/internal/ui/colors"
+	"github.com/lancekrogers/lazysql/internal/ui/icons"
+	uitree "github.com/lancekrogers/lazysql/internal/ui/tree"
 	"github.com/lancekrogers/lazysql/models"
 )
 
@@ -34,6 +36,9 @@ type Tree struct {
 	Wrapper             *tview.Flex
 	FoundNodeCountInput *tview.InputField
 	subscribers         []chan models.StateChange
+	Renderer            *uitree.Renderer
+	onExit              func()
+	Navigator           *uitree.Navigator
 }
 
 type TreeNodeType int
@@ -52,6 +57,26 @@ type TreeNodeData struct {
 	Database string
 	Schema   string
 	Name     string
+}
+
+func (tree *Tree) newNode(objType icons.ObjectType, name string) *tview.TreeNode {
+	node := tview.NewTreeNode("")
+	tree.applyNodeRenderer(node, objType, name)
+	return node
+}
+
+func (tree *Tree) applyNodeRenderer(node *tview.TreeNode, objType icons.ObjectType, name string) {
+	if node == nil {
+		return
+	}
+	if tree == nil || tree.Renderer == nil {
+		node.SetText(name)
+		return
+	}
+	rendered := tree.Renderer.Render(objType, name)
+	node.SetText(rendered.Text)
+	node.SetTextStyle(rendered.TextStyle)
+	node.SetSelectedTextStyle(rendered.SelectedTextStyle)
 }
 
 func (tree *Tree) GetTreeNodeData(node *tview.TreeNode) *TreeNodeData {
@@ -119,6 +144,9 @@ func NewTree(dbName string, dbdriver drivers.Driver) *Tree {
 		selectedTable:    "",
 	}
 
+	renderer := uitree.NewRenderer(colors.DefaultThemeManager)
+	navigator := uitree.NewNavigator()
+
 	tree := &Tree{
 		Wrapper:             tview.NewFlex(),
 		TreeView:            tview.NewTreeView(),
@@ -127,6 +155,8 @@ func NewTree(dbName string, dbdriver drivers.Driver) *Tree {
 		DBDriver:            dbdriver,
 		Filter:              tview.NewInputField(),
 		FoundNodeCountInput: tview.NewInputField(),
+		Renderer:            renderer,
+		Navigator:           navigator,
 	}
 
 	tree.SetTopLevel(1)
@@ -143,26 +173,6 @@ func NewTree(dbName string, dbdriver drivers.Driver) *Tree {
 	tree.SetFocusFunc(func() {
 		tree.InitializeNodes(dbName)
 		tree.SetFocusFunc(nil)
-	})
-
-	selectedNodeTextColor := fmt.Sprintf("[black:%s]", app.Styles.SecondaryTextColor.Name())
-	previouslyFocusedNode := tree.GetCurrentNode()
-	previouslyFocusedNode.SetText(selectedNodeTextColor + previouslyFocusedNode.GetText())
-
-	tree.SetChangedFunc(func(node *tview.TreeNode) {
-		// Set colors on focused node
-		nodeText := node.GetText()
-		if !strings.Contains(nodeText, selectedNodeTextColor) {
-			node.SetText(selectedNodeTextColor + nodeText)
-		}
-
-		// Remove colors on previously focused node
-		previousNodeText := previouslyFocusedNode.GetText()
-		splitNodeText := strings.Split(previousNodeText, selectedNodeTextColor)
-		if len(splitNodeText) > 1 {
-			previouslyFocusedNode.SetText(splitNodeText[1])
-		}
-		previouslyFocusedNode = node
 	})
 
 	tree.SetSelectedFunc(func(node *tview.TreeNode) {
@@ -212,22 +222,24 @@ func NewTree(dbName string, dbdriver drivers.Driver) *Tree {
 	})
 
 	tree.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event == nil {
+			return nil
+		}
+		if tree.Navigator != nil && tree.Navigator.HandleVimJump(event, tree.TreeView) {
+			return nil
+		}
+		if event.Key() == tcell.KeyEscape {
+			tree.exitFocus()
+			return nil
+		}
+
 		command := app.Keymaps.Group(app.TreeGroup).Resolve(event)
 
 		switch command {
 		case commands.GotoBottom:
-			childrens := tree.GetRoot().GetChildren()
-			lastNode := childrens[len(childrens)-1]
-
-			if lastNode.IsExpanded() {
-				childNodes := lastNode.GetChildren()
-				lastChildren := childNodes[len(childNodes)-1]
-				tree.SetCurrentNode(lastChildren)
-			} else {
-				tree.SetCurrentNode(lastNode)
-			}
+			uitree.GotoBottom(tree.TreeView)
 		case commands.GotoTop:
-			tree.SetCurrentNode(rootNode)
+			uitree.GotoTop(tree.TreeView)
 		case commands.PageNext:
 			tree.Move(5)
 		case commands.PagePrev:
@@ -269,6 +281,8 @@ func NewTree(dbName string, dbdriver drivers.Driver) *Tree {
 			} else {
 				if len(tree.state.searchFoundNodes) > 0 {
 					tree.FoundNodeCountInput.SetText(fmt.Sprintf("[1/%d]", len(tree.state.searchFoundNodes)))
+				} else {
+					tree.FoundNodeCountInput.SetText("[0/0]")
 				}
 				tree.SetBorderPadding(1, 0, 0, 0)
 			}
@@ -340,10 +354,13 @@ func (tree *Tree) databasesToNodes(children map[string][]string, node *tview.Tre
 		nodeReference := node.GetReference().(string)
 
 		if key != nodeReference {
-			rootNode = tview.NewTreeNode(key)
+			iconType := icons.TypeDatabase
+			if tree.DBDriver.UseSchemas() {
+				iconType = icons.TypeSchema
+			}
+			rootNode = tree.newNode(iconType, key)
 			rootNode.SetExpanded(false)
 			rootNode.SetReference(key)
-			rootNode.SetColor(app.Styles.PrimaryTextColor)
 			node.AddChild(rootNode)
 			tablesContainer = rootNode
 		} else {
@@ -352,9 +369,8 @@ func (tree *Tree) databasesToNodes(children map[string][]string, node *tview.Tre
 
 		supportsProgramming := tree.DBDriver.SupportsProgramming()
 		if supportsProgramming {
-			tablesNode := tview.NewTreeNode("tables")
+			tablesNode := tree.newNode(icons.TypeTable, "tables")
 			tablesNode.SetExpanded(false)
-			tablesNode.SetColor(app.Styles.PrimaryTextColor)
 
 			if rootNode != nil {
 				tablesNode.SetReference(fmt.Sprintf("%s.tables", key))
@@ -368,9 +384,8 @@ func (tree *Tree) databasesToNodes(children map[string][]string, node *tview.Tre
 		}
 
 		for _, child := range values {
-			childNode := tview.NewTreeNode(child)
+			childNode := tree.newNode(icons.TypeTable, child)
 			childNode.SetExpanded(defaultExpanded)
-			childNode.SetColor(app.Styles.PrimaryTextColor)
 
 			if tree.DBDriver.UseSchemas() {
 				if supportsProgramming {
@@ -392,22 +407,20 @@ func (tree *Tree) databasesToNodes(children map[string][]string, node *tview.Tre
 }
 
 func (tree *Tree) addProgrammingNodes(functions map[string][]string, procedures map[string][]string, views map[string][]string, node *tview.TreeNode) {
-	database := node.GetText()
+	database := node.GetReference().(string)
 	dbFunctions := functions[database]
 	sort.Strings(dbFunctions)
 
 	var functionsNode *tview.TreeNode
 	functionsNodeReference := fmt.Sprintf("%s.functions", node.GetReference().(string))
-	functionsNode = tview.NewTreeNode("functions")
+	functionsNode = tree.newNode(icons.TypeFunction, "functions")
 	functionsNode.SetExpanded(false)
 	functionsNode.SetReference(functionsNodeReference)
-	functionsNode.SetColor(app.Styles.PrimaryTextColor)
 	node.AddChild(functionsNode)
 
 	for _, function := range dbFunctions {
-		functionNode := tview.NewTreeNode(function)
+		functionNode := tree.newNode(icons.TypeFunction, function)
 		functionNode.SetExpanded(false)
-		functionNode.SetColor(app.Styles.PrimaryTextColor)
 		functionNode.SetReference(fmt.Sprintf("%s.%s", functionsNodeReference, function))
 		functionsNode.AddChild(functionNode)
 	}
@@ -417,16 +430,14 @@ func (tree *Tree) addProgrammingNodes(functions map[string][]string, procedures 
 
 	var proceduresNode *tview.TreeNode
 	proceduresNodeReference := fmt.Sprintf("%s.procedures", node.GetReference().(string))
-	proceduresNode = tview.NewTreeNode("procedures")
+	proceduresNode = tree.newNode(icons.TypeProcedure, "procedures")
 	proceduresNode.SetExpanded(false)
 	proceduresNode.SetReference(proceduresNodeReference)
-	proceduresNode.SetColor(app.Styles.PrimaryTextColor)
 	node.AddChild(proceduresNode)
 
 	for _, procedure := range dbProcedures {
-		procedureNode := tview.NewTreeNode(procedure)
+		procedureNode := tree.newNode(icons.TypeProcedure, procedure)
 		procedureNode.SetExpanded(false)
-		procedureNode.SetColor(app.Styles.PrimaryTextColor)
 		procedureNode.SetReference(fmt.Sprintf("%s.%s", proceduresNodeReference, procedure))
 		proceduresNode.AddChild(procedureNode)
 	}
@@ -436,51 +447,17 @@ func (tree *Tree) addProgrammingNodes(functions map[string][]string, procedures 
 
 	var viewsNode *tview.TreeNode
 	viewsNodeReference := fmt.Sprintf("%s.views", node.GetReference().(string))
-	viewsNode = tview.NewTreeNode("views")
+	viewsNode = tree.newNode(icons.TypeView, "views")
 	viewsNode.SetExpanded(false)
 	viewsNode.SetReference(viewsNodeReference)
-	viewsNode.SetColor(app.Styles.PrimaryTextColor)
 	node.AddChild(viewsNode)
 
 	for _, view := range dbViews {
-		viewNode := tview.NewTreeNode(view)
+		viewNode := tree.newNode(icons.TypeView, view)
 		viewNode.SetExpanded(false)
-		viewNode.SetColor(app.Styles.PrimaryTextColor)
 		viewNode.SetReference(fmt.Sprintf("%s.%s", viewsNodeReference, view))
 		viewsNode.AddChild(viewNode)
 	}
-}
-
-func prioritizeResult(pattern, target string, fuzzyRank int) int {
-	// play match golf - lowest score wins
-
-	// Exact match
-	if pattern == target {
-		return 0
-	}
-
-	// Prefix is scored on length difference, 1-99
-	if strings.HasPrefix(target, pattern) {
-		lengthDiff := len(target) - len(pattern)
-		if lengthDiff > 98 {
-			lengthDiff = 98
-		}
-		return 1 + lengthDiff
-	}
-
-	// Substr penalized by distance from start and length diff
-	if strings.Contains(target, pattern) {
-		index := strings.Index(target, pattern)
-		lengthPenalty := len(target) - len(pattern)
-		score := 100 + index + lengthPenalty
-		if score > 9999 {
-			score = 9999
-		}
-		return score
-	}
-
-	// If no other matches, fall back to fuzzy match with a low score
-	return 10000 + fuzzyRank
 }
 
 func (tree *Tree) search(searchText string) {
@@ -498,62 +475,7 @@ func (tree *Tree) search(searchText string) {
 		return
 	}
 
-	parts := strings.SplitN(lowerSearchText, " ", 2)
-	databaseNameFilter := ""
-	tableNameFilter := ""
-
-	if len(parts) == 1 {
-		tableNameFilter = parts[0]
-	} else {
-		databaseNameFilter = parts[0]
-		tableNameFilter = parts[1]
-	}
-
-	// Collect nodes with their match ranks
-	type rankedNode struct {
-		node *tview.TreeNode
-		rank int
-	}
-	var rankedNodes []rankedNode
-
-	rootNode.Walk(func(node, parent *tview.TreeNode) bool {
-		nodeText := strings.ToLower(node.GetText())
-
-		if databaseNameFilter == "" {
-			rank := fuzzy.RankMatch(tableNameFilter, nodeText)
-			if rank >= 0 {
-				if parent != nil {
-					parent.SetExpanded(true)
-				}
-				adjustedRank := prioritizeResult(tableNameFilter, nodeText, rank)
-				rankedNodes = append(rankedNodes, rankedNode{node: node, rank: adjustedRank})
-			}
-		} else {
-			rank := fuzzy.RankMatch(tableNameFilter, nodeText)
-			if rank >= 0 && parent != nil {
-				parentText := strings.ToLower(parent.GetText())
-				parentRank := fuzzy.RankMatch(databaseNameFilter, parentText)
-				if parentRank >= 0 {
-					parent.SetExpanded(true)
-					adjustedTableRank := prioritizeResult(tableNameFilter, nodeText, rank)
-					adjustedParentRank := prioritizeResult(databaseNameFilter, parentText, parentRank)
-					// Combine ranks: prioritize table match but factor in database match
-					combinedRank := adjustedTableRank + (adjustedParentRank / 2)
-					rankedNodes = append(rankedNodes, rankedNode{node: node, rank: combinedRank})
-				}
-			}
-		}
-
-		return true
-	})
-
-	sort.Slice(rankedNodes, func(i, j int) bool {
-		return rankedNodes[i].rank < rankedNodes[j].rank
-	})
-
-	for _, rn := range rankedNodes {
-		tree.state.searchFoundNodes = append(tree.state.searchFoundNodes, rn.node)
-	}
+	tree.state.searchFoundNodes = uitree.Search(rootNode, lowerSearchText)
 
 	// Set current node to best match
 	if len(tree.state.searchFoundNodes) > 0 {
@@ -573,6 +495,16 @@ func (tree *Tree) Subscribe() chan models.StateChange {
 func (tree *Tree) Publish(change models.StateChange) {
 	for _, subscriber := range tree.subscribers {
 		subscriber <- change
+	}
+}
+
+func (tree *Tree) SetOnExit(fn func()) {
+	tree.onExit = fn
+}
+
+func (tree *Tree) exitFocus() {
+	if tree.onExit != nil {
+		tree.onExit()
 	}
 }
 
@@ -801,10 +733,9 @@ func (tree *Tree) InitializeNodes(dbName string) {
 	}
 
 	for _, database := range databases {
-		childNode := tview.NewTreeNode(database)
+		childNode := tree.newNode(icons.TypeDatabase, database)
 		childNode.SetExpanded(false)
 		childNode.SetReference(database)
-		childNode.SetColor(app.Styles.PrimaryTextColor)
 		rootNode.AddChild(childNode)
 
 		go func(database string, node *tview.TreeNode) {
