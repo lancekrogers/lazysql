@@ -47,7 +47,7 @@ func NewSharedContainer() (*TestContainer, error) {
 			"POSTGRES_PASSWORD": password,
 			"POSTGRES_DB":       database,
 		},
-		WaitingFor: wait.ForLog("database system is ready to accept connections").WithStartupTimeout(60 * time.Second),
+		WaitingFor: wait.ForLog("database system is ready to accept connections").WithOccurrence(2).WithStartupTimeout(60 * time.Second),
 		AutoRemove: true,
 	}
 

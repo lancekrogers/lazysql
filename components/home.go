@@ -97,6 +97,10 @@ func NewHomePage(connection models.Connection, dbdriver drivers.Driver) *Home {
 	leaderRegistry := leader.NewRegistry()
 	leaderOverlay := whichkey.NewOverlay(app.App.Application)
 	leaderOverlay.SetPosition(whichkey.PositionBottomRight)
+	leaderOverlay.SetFocusSetter(func(p tview.Primitive) {
+		app.App.SetFocus(p)
+	})
+	leaderOverlay.SetReturnFocus(tree)
 
 	home := &Home{
 		Flex:                tview.NewFlex().SetDirection(tview.FlexRow),
@@ -157,9 +161,6 @@ func NewHomePage(connection models.Connection, dbdriver drivers.Driver) *Home {
 		logger.Error("Failed to register leader command", map[string]any{"error": err})
 	}
 
-	leaderManager := leader.NewManager(leaderRegistry, leaderOverlay, leader.ConfigFromApp(app.App.Config()).Timeout, homeStatusReporter{home: home})
-	home.LeaderManager = leaderManager
-
 	bufferNamespace := namespace.NewBufferNamespace(bufferManager, bufferNavigator, bufferPicker)
 	shellNamespace := namespace.NewShellNamespace(home)
 	runNamespace := namespace.NewRunNamespace(home)
@@ -175,6 +176,10 @@ func NewHomePage(connection models.Connection, dbdriver drivers.Driver) *Home {
 	} else {
 		home.NamespaceRegistry = namespaceRegistry
 	}
+
+	// Create leader manager AFTER all commands are registered so the KeyTree is complete
+	leaderManager := leader.NewManager(leaderRegistry, leaderOverlay, leader.ConfigFromApp(app.App.Config()).Timeout, homeStatusReporter{home: home})
+	home.LeaderManager = leaderManager
 
 	tabbedPane := NewTabbedPane()
 

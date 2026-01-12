@@ -8,7 +8,7 @@ default:
 # Run all tests (unit + integration; requires Docker)
 [no-cd]
 all:
-    go test -tags=integration ./...
+    TESTCONTAINERS_RYUK_DISABLED=true go test -v -count=1 -tags=integration ./...
 
 # Run unit tests with short mode
 [no-cd]
@@ -38,4 +38,4 @@ coverage-html:
 # Run integration tests (requires Docker)
 [no-cd]
 integration:
-    go test -tags=integration ./tests/integration/...
+    TESTCONTAINERS_RYUK_DISABLED=true go test -v -count=1 -tags=integration ./tests/integration/...
