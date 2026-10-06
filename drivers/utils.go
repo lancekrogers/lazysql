@@ -24,6 +24,9 @@ func queriesInTransaction(db *sql.DB, queries []models.Query) (err error) {
 	}()
 
 	for _, query := range queries {
+		if query.Query == "" {
+			continue
+		}
 		if _, err := trx.Exec(query.Query, query.Args...); err != nil {
 			return err
 		}
@@ -61,7 +64,7 @@ func buildInsertQuery(formattedTableName string, values []models.CellValue, driv
 
 		if value.Value != nil && value.Type != models.Default {
 			placeholders = append(placeholders, driver.FormatPlaceholder(index))
-			args = append(args, value.Value)
+			args = append(args, driver.FormatArg(value.Value, value.Type))
 			index++
 		}
 	}
@@ -118,6 +121,10 @@ func buildUpdateQueryString(sanitizedTableName string, colNames []string, args [
 }
 
 func buildUpdateQuery(sanitizedTableName string, values []models.CellValue, primaryKeyInfo []models.PrimaryKeyInfo, driver Driver) models.Query {
+	if len(primaryKeyInfo) == 0 {
+		return models.Query{}
+	}
+
 	argsWithoutDefaults := []models.CellValue{}
 
 	for _, arg := range values {
@@ -205,6 +212,10 @@ func buildDeleteQueryString(sanitizedTableName string, primaryKeyInfo []models.P
 }
 
 func buildDeleteQuery(formattedTableName string, primaryKeyInfo []models.PrimaryKeyInfo, driver Driver) models.Query {
+	if len(primaryKeyInfo) == 0 {
+		return models.Query{}
+	}
+
 	queryStr := "DELETE FROM " + formattedTableName
 	args := make([]any, len(primaryKeyInfo))
 

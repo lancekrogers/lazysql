@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
@@ -179,10 +180,10 @@ func openExternalEditor(currentText string, connectionURL string) string {
 		}()
 	}
 
-	editor := getEditor()
+	editor := editorCommand(true)
 
 	// #nosec G204 -- user-configured editor command
-	cmd := exec.Command(editor, path)
+	cmd := exec.Command(editor[0], append(editor[1:], path)...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -201,19 +202,71 @@ func openExternalEditor(currentText string, connectionURL string) string {
 	return string(updatedContent)
 }
 
-func getEditor() string {
-	editor := os.Getenv("SQL_EDITOR")
+func editorCommand(preferSQL bool) []string {
+	editor := ""
+	if preferSQL {
+		editor = os.Getenv("SQL_EDITOR")
+	}
 	if editor == "" {
 		editor = os.Getenv("EDITOR")
 	}
-
 	if editor == "" {
 		editor = os.Getenv("VISUAL")
 	}
-
 	if editor == "" {
 		editor = "vi"
 	}
+	parts := strings.Fields(editor)
+	if len(parts) == 0 {
+		return []string{"vi"}
+	}
+	return parts
+}
 
-	return editor
+// openCellInExternalEditor opens the user's preferred editor to edit a cell value.
+// It should be called within app.Suspend() to ensure the TUI is properly restored.
+func openCellInExternalEditor(currentText string) string {
+	tmpFile, err := os.CreateTemp("", "lazysql-cell-*.txt")
+	if err != nil {
+		logger.Error("Failed to create temporary file", map[string]any{"error": err.Error()})
+		return currentText
+	}
+	defer func() {
+		if err := os.Remove(tmpFile.Name()); err != nil {
+			logger.Error("Failed to remove temporary file", map[string]any{"error": err.Error()})
+		}
+	}()
+
+	if _, err := tmpFile.WriteString(currentText); err != nil {
+		logger.Error("Failed to write to temporary file", map[string]any{"error": err.Error()})
+		if closeErr := tmpFile.Close(); closeErr != nil {
+			logger.Error("Failed to close temporary file", map[string]any{"error": closeErr.Error()})
+		}
+		return currentText
+	}
+	if err := tmpFile.Close(); err != nil {
+		logger.Error("Failed to close temporary file", map[string]any{"error": err.Error()})
+		return currentText
+	}
+
+	editor := editorCommand(false)
+	// #nosec G204 -- user-configured editor command
+	cmd := exec.Command(editor[0], append(editor[1:], tmpFile.Name())...)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		logger.Error("Error executing editor", map[string]any{"error": err.Error(), "command": cmd.String()})
+		return currentText
+	}
+
+	// #nosec G304 -- reading temporary file created by this function
+	updatedContent, err := os.ReadFile(tmpFile.Name())
+	if err != nil {
+		logger.Error("Failed to read from temporary file", map[string]any{"error": err.Error()})
+		return currentText
+	}
+
+	return string(updatedContent)
 }

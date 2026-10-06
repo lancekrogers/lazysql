@@ -23,10 +23,6 @@ type Postgres struct {
 	Urlstr           string
 }
 
-const (
-	defaultPort = "5432"
-)
-
 func (db *Postgres) TestConnection(urlstr string) error {
 	return db.Connect(urlstr)
 }
@@ -827,34 +823,54 @@ func (db *Postgres) GetProvider() string {
 	return db.Provider
 }
 
+func dsnValue(dsn, key string) string {
+	prefix := key + "="
+	for part := range strings.SplitSeq(dsn, " ") {
+		if after, ok := strings.CutPrefix(part, prefix); ok {
+			return after
+		}
+	}
+	return ""
+}
+
+func buildReconnectURL(urlstr, newDB string) (string, error) {
+	parsed, err := dburl.Parse(urlstr)
+	if err != nil {
+		return "", err
+	}
+	if parsed.Transport == "unix" {
+		host := dsnValue(parsed.DSN, "host")
+		port := dsnValue(parsed.DSN, "port")
+		if port != "" {
+			parsed.Path = host + ":" + port + "/" + newDB
+		} else {
+			parsed.Path = host + "/" + newDB
+		}
+	} else {
+		parsed.Path = "/" + newDB
+	}
+	return parsed.String(), nil
+}
+
 func (db *Postgres) SwitchDatabase(database string) error {
-	parsedConn, err := dburl.Parse(db.Urlstr)
+	urlstr, err := buildReconnectURL(db.Urlstr, database)
 	if err != nil {
 		return err
 	}
 
-	user := parsedConn.User.Username()
-	password, _ := parsedConn.User.Password()
-	host := parsedConn.Host
-	port := parsedConn.Port()
-	dbname := parsedConn.Path
-
-	if port == "" {
-		port = defaultPort
-	}
-
-	if dbname == "" {
-		dbname = database
-	}
-
-	connection, err := sql.Open("postgres", fmt.Sprintf("host=%s port=%s user=%s password=%s dbname='%s' sslmode=disable", host, port, user, password, dbname))
+	connection, err := dburl.Open(urlstr)
 	if err != nil {
 		return err
 	}
 
-	err = db.Connection.Close()
-	if err != nil {
-		return err
+	if db.Connection != nil {
+		err = db.Connection.Close()
+		if err != nil {
+			if closeErr := connection.Close(); closeErr != nil {
+				logger.Error("Failed to close postgres connection", map[string]any{"error": closeErr})
+			}
+			return err
+		}
 	}
 
 	db.Connection = connection

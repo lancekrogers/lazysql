@@ -100,6 +100,7 @@ var Keymaps = KeymapSystem{
 		TableGroup: {
 			Bind{Key: Key{Char: '/'}, Cmd: cmd.Search, Description: "Search"},
 			Bind{Key: Key{Char: 'c'}, Cmd: cmd.Edit, Description: "Change cell"},
+			Bind{Key: Key{Char: 'e'}, Cmd: cmd.OpenInExternalEditor, Description: "Edit cell in external editor"},
 			Bind{Key: Key{Char: 'd'}, Cmd: cmd.Delete, Description: "Delete row"},
 			Bind{Key: Key{Char: 'w'}, Cmd: cmd.GotoNext, Description: "Go to next cell"},
 			Bind{Key: Key{Char: 'b'}, Cmd: cmd.GotoPrev, Description: "Go to previous cell"},

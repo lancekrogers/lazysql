@@ -3,6 +3,7 @@ package components
 import (
 	"errors"
 	"fmt"
+	"runtime"
 	"strings"
 
 	"github.com/gdamore/tcell/v2"
@@ -254,7 +255,7 @@ func (table *ResultsTable) subscribeToSidebarChanges() {
 			changedColumnIndex := table.GetColumnIndexByName(params.ColumnName)
 			tableCell := table.GetCell(row, changedColumnIndex)
 
-			tableCell.SetText(params.NewValue)
+			tableCell.SetText(tview.Escape(params.NewValue))
 
 			cellValue := models.CellValue{
 				Type:             params.Type,
@@ -281,7 +282,7 @@ func (table *ResultsTable) subscribeToSidebarChanges() {
 func (table *ResultsTable) AddRows(rows [][]string) {
 	for i, row := range rows {
 		for j, cell := range row {
-			tableCell := tview.NewTableCell(cell)
+			tableCell := tview.NewTableCell(tview.Escape(cell))
 			tableCell.SetTextColor(app.Styles.PrimaryTextColor)
 
 			if cell == "EMPTY&" || cell == "NULL&" || cell == "DEFAULT&" {
@@ -322,7 +323,7 @@ func (table *ResultsTable) AddInsertedRows() {
 		rowIndex := rowCount + i
 
 		for j, cell := range row {
-			tableCell := tview.NewTableCell(cell.Value.(string))
+			tableCell := tview.NewTableCell(tview.Escape(cell.Value.(string)))
 			tableCell.SetExpansion(1)
 			tableCell.SetReference(inserts[i].PrimaryKeyInfo[0].Value)
 
@@ -336,7 +337,7 @@ func (table *ResultsTable) AddInsertedRows() {
 
 func (table *ResultsTable) AppendNewRow(cells []models.CellValue, index int, UUID string) {
 	for i, cell := range cells {
-		tableCell := tview.NewTableCell(cell.Value.(string))
+		tableCell := tview.NewTableCell(tview.Escape(cell.Value.(string)))
 		tableCell.SetExpansion(1)
 		// Appended rows have a reference to the row UUID so we can identify them later
 		// Also, rows that have columns marked to be UPDATED will have a reference to the type of the new value (NULL, EMPTY, DEFAULT)
@@ -545,11 +546,13 @@ func (table *ResultsTable) tableInputCapture(event *tcell.EventKey) *tcell.Event
 		selectedCell := table.GetCell(selectedRowIndex, selectedColumnIndex)
 		if selectedCell != nil {
 			clipboard := lib.NewClipboard()
-			err := clipboard.Write(selectedCell.Text)
+			err := clipboard.Write(cellText(selectedCell))
 			if err != nil {
 				table.SetError(err.Error(), nil)
 			}
 		}
+	} else if command == commands.OpenInExternalEditor {
+		table.editCellInExternalEditor(selectedRowIndex, selectedColumnIndex)
 	}
 
 	if len(table.GetRecords()) > 0 {
@@ -677,17 +680,19 @@ func (table *ResultsTable) ExecuteEditorQuery(query string) error {
 		return errors.New("editor not initialized")
 	}
 
-	queryLower := strings.ToLower(query)
-	queryTrimmed := strings.TrimSpace(queryLower)
+	provider := ""
+	if table.DBDriver != nil {
+		provider = table.DBDriver.GetProvider()
+	}
 
-	isSelect := strings.HasPrefix(queryTrimmed, "select") ||
-		strings.HasPrefix(queryTrimmed, "with") ||
-		strings.HasPrefix(queryTrimmed, "explain") ||
-		strings.HasPrefix(queryTrimmed, "show") ||
-		strings.HasPrefix(queryTrimmed, "describe") ||
-		strings.HasPrefix(queryTrimmed, "desc")
+	if table.ReadOnly {
+		if err := drivers.ValidateQueryForReadOnly(query); err != nil {
+			table.SetError("Cannot execute mutation query: Connection is in read-only mode", nil)
+			return err
+		}
+	}
 
-	if isSelect {
+	if queryReturnsRows(query, provider) {
 		table.SetLoading(true)
 		App.Draw()
 
@@ -717,13 +722,6 @@ func (table *ResultsTable) ExecuteEditorQuery(query string) error {
 		}
 		App.Draw()
 		return nil
-	}
-
-	if table.ReadOnly {
-		if err := drivers.ValidateQueryForReadOnly(query); err != nil {
-			table.SetError("Cannot execute mutation query: Connection is in read-only mode", nil)
-			return err
-		}
 	}
 
 	table.SetRecords([][]string{})
@@ -993,13 +991,13 @@ func (table *ResultsTable) SetSortedBy(column string, direction string) {
 
 		for i, col := range columns {
 			if i > 0 {
-				tableCell := tview.NewTableCell(col[0])
+				tableCell := tview.NewTableCell(tview.Escape(col[0]))
 				tableCell.SetSelectable(false)
 				tableCell.SetExpansion(1)
 				tableCell.SetTextColor(app.Styles.PrimaryTextColor)
 
 				if col[0] == column {
-					tableCell.SetText(fmt.Sprintf("%s %s", col[0], iconDirection))
+					tableCell.SetText(tview.Escape(fmt.Sprintf("%s %s", col[0], iconDirection)))
 					table.SetCell(0, i-1, tableCell)
 				} else {
 					table.SetCell(0, i-1, tableCell)
@@ -1082,6 +1080,11 @@ func (table *ResultsTable) FetchRecords(onError func()) [][]string {
 
 		table.SetLoading(false)
 
+		if len(primaryKeyColumnNames) == 0 && table.Pagination != nil && table.Pagination.textView != nil {
+			currentText := table.Pagination.textView.GetText(false)
+			table.Pagination.textView.SetText(currentText + "  ⚠ No Primary Key")
+		}
+
 		return records
 	}
 
@@ -1094,18 +1097,18 @@ func (table *ResultsTable) StartEditingCell(row int, col int, callback func(newV
 
 	cell := table.GetCell(row, col)
 	inputField := tview.NewInputField()
-	inputField.SetText(cell.Text)
+	inputField.SetText(cellText(cell))
 	inputField.SetFieldBackgroundColor(app.Styles.PrimaryTextColor)
 	inputField.SetFieldTextColor(app.Styles.PrimitiveBackgroundColor)
 	inputField.SetBorder(true)
 
-	initialText := cell.Text
+	initialText := cellText(cell)
 
 	inputField.SetDoneFunc(func(key tcell.Key) {
 		table.SetIsEditing(false)
-		currentValue := cell.Text
+		currentValue := cellText(cell)
 		newValue := inputField.GetText()
-		columnName := table.GetCell(0, col).Text
+		columnName := cellText(table.GetCell(0, col))
 
 		// Remove the sorting icon from the column name
 		columnName = strings.ReplaceAll(columnName, " ▼", "")
@@ -1114,7 +1117,7 @@ func (table *ResultsTable) StartEditingCell(row int, col int, callback func(newV
 		var appendErr error
 
 		if key != tcell.KeyEscape {
-			cell.SetText(newValue)
+			cell.SetText(tview.Escape(newValue))
 
 			if currentValue != newValue {
 				appendErr = table.AppendNewChange(models.DMLUpdateType, row, col, models.CellValue{Type: models.String, Value: newValue, Column: columnName, TableColumnIndex: col, TableRowIndex: row})
@@ -1187,12 +1190,12 @@ func (table *ResultsTable) handleShowJSONViewer(command commands.Command) {
 	case commands.ShowRowJSONViewer:
 		for i := 0; i < table.GetColumnCount(); i++ {
 			columnName := table.GetColumnNameByIndex(i)
-			cellValue := table.GetCell(selectedRow, i).Text
+			cellValue := cellText(table.GetCell(selectedRow, i))
 			rowData[columnName] = cellValue
 		}
 	case commands.ShowCellJSONViewer:
 		columnName := table.GetColumnNameByIndex(selectedCol)
-		cellValue := table.GetCell(selectedRow, selectedCol).Text
+		cellValue := cellText(table.GetCell(selectedRow, selectedCol))
 		rowData[columnName] = cellValue
 	}
 
@@ -1335,13 +1338,31 @@ func (table *ResultsTable) GetPrimaryKeyValue(rowIndex int) []models.PrimaryKeyI
 	primaryKeyColumnNames := table.GetPrimaryKeyColumnNames()
 
 	info := []models.PrimaryKeyInfo{}
+	records := table.GetRecords()
+	if rowIndex < 0 || rowIndex >= len(records) {
+		return info
+	}
+	row := records[rowIndex]
+
+	// Tables without a primary key identify a row by every original column value.
+	if len(primaryKeyColumnNames) == 0 {
+		columns := records[0]
+		for i, colName := range columns {
+			if i >= len(row) {
+				break
+			}
+			info = append(info, models.PrimaryKeyInfo{Name: colName, Value: row[i]})
+		}
+		return info
+	}
 
 	for _, primaryKeyColumnName := range primaryKeyColumnNames {
 		columnIndex := table.GetColumnIndexByName(primaryKeyColumnName)
-		records := table.GetRecords()
-		primaryKeyValue := records[rowIndex][columnIndex]
+		if columnIndex < 0 || columnIndex >= len(row) {
+			continue
+		}
 
-		info = append(info, models.PrimaryKeyInfo{Name: primaryKeyColumnName, Value: primaryKeyValue})
+		info = append(info, models.PrimaryKeyInfo{Name: primaryKeyColumnName, Value: row[columnIndex]})
 	}
 
 	return info
@@ -1398,7 +1419,7 @@ func (table *ResultsTable) duplicateRow() {
 	for i, column := range dbColumns {
 		if i != 0 { // Skip the first row because they are the column names (e.x "Field", "Type", "Null", "Key", "Default", "Extra")
 			origCell := table.GetCell(row, i-1)
-			newRow[i-1] = models.CellValue{Type: models.String, Column: column[0], Value: origCell.Text, TableRowIndex: newRowTableIndex, TableColumnIndex: i}
+			newRow[i-1] = models.CellValue{Type: models.String, Column: column[0], Value: cellText(origCell), TableRowIndex: newRowTableIndex, TableColumnIndex: i}
 		}
 	}
 
@@ -1570,7 +1591,7 @@ func (table *ResultsTable) UpdateSidebar() {
 
 			sidebarWidth := table.getSidebarWidth()
 
-			text := table.GetCell(selectedRow, i-1).Text
+			text := cellText(table.GetCell(selectedRow, i-1))
 			title := name
 
 			repeatCount := sidebarWidth - len(name) - len(colType) - 4 // idk why 4 is needed, but it works.
@@ -1657,6 +1678,57 @@ func (table *ResultsTable) colorChangedCells() {
 				table.SetCellColor(value.TableRowIndex, value.TableColumnIndex, colorTableChange)
 			}
 		}
+	}
+}
+
+// cellText returns the value shown in a results cell. Cell text is stored
+// tview-escaped so values like "[red]" or `["x"]` are not parsed as style or
+// region tags; this undoes that escaping.
+func cellText(cell *tview.TableCell) string {
+	if cell == nil {
+		return ""
+	}
+	return tview.Unescape(cell.Text)
+}
+
+func (table *ResultsTable) editCellInExternalEditor(row, col int) {
+	if row <= 0 {
+		return
+	}
+	if table.ReadOnly {
+		table.SetError("Cannot modify data: Connection is in read-only mode", nil)
+		return
+	}
+	if table.Editor != nil || (runtime.GOOS != "linux" && runtime.GOOS != "darwin") {
+		return
+	}
+
+	selectedCell := table.GetCell(row, col)
+	if selectedCell == nil {
+		return
+	}
+
+	originalText := cellText(selectedCell)
+	var newText string
+	App.Suspend(func() {
+		newText = openCellInExternalEditor(originalText)
+	})
+	newText = strings.TrimSuffix(newText, "\n")
+	if newText == originalText {
+		return
+	}
+
+	selectedCell.SetText(tview.Escape(newText))
+	err := table.AppendNewChange(models.DMLUpdateType, row, col, models.CellValue{
+		Type:             models.String,
+		Value:            newText,
+		Column:           table.GetColumnNameByIndex(col),
+		TableColumnIndex: col,
+		TableRowIndex:    row,
+	})
+	if err != nil {
+		selectedCell.SetText(tview.Escape(originalText))
+		table.SetError(err.Error(), nil)
 	}
 }
 

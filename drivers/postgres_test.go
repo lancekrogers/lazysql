@@ -9,6 +9,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	_ "github.com/lib/pq"
+	"github.com/xo/dburl"
 
 	"github.com/lancekrogers/lazysql/models"
 )
@@ -20,6 +21,31 @@ const (
 )
 
 var schemaAndTablePostgres = fmt.Sprintf("%s.%s", schemaPostgres, tableNamePostgres)
+
+func TestBuildReconnectURLPreservesOptions(t *testing.T) {
+	original := "postgres://user:pass@localhost:5432/olddb?sslmode=require&options=-csearch_path%3Dpublic"
+	got, err := buildReconnectURL(original, "newdb")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	parsed, err := dburl.Parse(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasSuffix(parsed.Path, "/newdb") {
+		t.Fatalf("path = %q, want a path ending in /newdb", parsed.Path)
+	}
+	if strings.Contains(parsed.Path, "olddb") {
+		t.Fatalf("path = %q, still points at olddb", parsed.Path)
+	}
+	if !strings.Contains(got, "sslmode=require") {
+		t.Fatalf("dropped sslmode: %s", got)
+	}
+	if !strings.Contains(got, "options=") {
+		t.Fatalf("dropped options: %s", got)
+	}
+}
 
 func TestPostgres_FormatArg_SpecialCharacters(t *testing.T) {
 	db := &Postgres{}
